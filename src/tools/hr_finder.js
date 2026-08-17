@@ -1,52 +1,74 @@
 /**
- * HR & Recruiter Email Finder Module (/hrfind)
- * Uses Hunter.io API + Corporate Email Patterns + LinkedIn Recruiter X-Ray Links
+ * Zero-Config HR & Recruiter Email Finder Engine (/hrfind)
+ * No business email required, no signups needed!
  */
 
-export async function findHREmails(companyDomainOrName) {
-  const domain = companyDomainOrName.toLowerCase().replace(/https?:\/\//, "").replace(/www\./, "").split("/")[0];
-  const hunterApiKey = process.env.HUNTER_API_KEY;
+export async function findHREmails(companyDomainOrName, recruiterName = "") {
+  const cleanDomain = companyDomainOrName
+    .toLowerCase()
+    .trim()
+    .replace(/https?:\/\//, "")
+    .replace(/www\./, "")
+    .split("/")[0];
 
-  let emailsFound = [];
-  let patternInfo = "";
+  const companyName = cleanDomain.split(".")[0];
+  const capitalizedCompany = companyName.charAt(0).toUpperCase() + companyName.slice(1);
 
-  if (hunterApiKey) {
-    try {
-      const url = `https://api.hunter.io/v2/domain-search?domain=${domain}&department=hr&api_key=${hunterApiKey}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        const emails = data.data?.emails || [];
-        emailsFound = emails.map(e => `• **${e.first_name} ${e.last_name}** (${e.position || "HR/Recruiter"}): \`${e.value}\``);
-        if (data.data?.pattern) {
-          patternInfo = `\n💡 Company Email Pattern: \`${data.data.pattern}@${domain}\``;
-        }
-      }
-    } catch (err) {
-      console.warn(`[HR Finder] Hunter.io API failed: ${err.message}`);
+  // 1. Core Corporate HR & Talent Acquisition Inboxes
+  const standardInboxes = [
+    `careers@${cleanDomain}`,
+    `recruiting@${cleanDomain}`,
+    `hr@${cleanDomain}`,
+    `talent@${cleanDomain}`,
+    `jobs@${cleanDomain}`,
+    `university@${cleanDomain}`
+  ];
+
+  // 2. Personal Recruiter Email Permutations (if recruiter name is provided)
+  let emailPermutations = [];
+  if (recruiterName) {
+    const parts = recruiterName.toLowerCase().trim().split(/\s+/);
+    const first = parts[0] || "";
+    const last = parts[parts.length - 1] || "";
+
+    if (first && last) {
+      emailPermutations = [
+        `${first}.${last}@${cleanDomain}`,
+        `${first}${last}@${cleanDomain}`,
+        `${first}@${cleanDomain}`,
+        `${first[0]}${last}@${cleanDomain}`,
+        `${first}.${last[0]}@${cleanDomain}`
+      ];
     }
   }
 
-  // Fallback / Standard Email Alias Patterns
-  const standardAliases = [
-    `careers@${domain}`,
-    `recruiting@${domain}`,
-    `hr@${domain}`,
-    `talent@${domain}`
-  ];
+  // 3. Search Engine X-Ray Query Links (Instant 1-Click Search)
+  const linkedinRecruiterQuery = `site:linkedin.com/in/ ("recruiter" OR "talent acquisition" OR "technical recruiter" OR "HR") "${capitalizedCompany}"`;
+  const linkedinSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(linkedinRecruiterQuery)}`;
 
-  // LinkedIn Google X-Ray Search URL to find recruiters for this company instantly
-  const linkedinXrayUrl = `https://www.google.com/search?q=${encodeURIComponent(`site:linkedin.com/in/ "recruiter" OR "talent acquisition" OR "HR" "${domain.split('.')[0]}"`)}`;
+  const twitterHiringQuery = `"hiring" ("intern" OR "software" OR "developer") "${capitalizedCompany}"`;
+  const twitterSearchUrl = `https://x.com/search?q=${encodeURIComponent(twitterHiringQuery)}&f=live`;
 
-  let response = `🔍 **HR & Recruiter Finder for ${domain}**\n\n`;
+  const publicEmailSearchQuery = `"@${cleanDomain}" ("recruiter" OR "HR" OR "careers" OR "hiring")`;
+  const googleEmailSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(publicEmailSearchQuery)}`;
 
-  if (emailsFound.length > 0) {
-    response += `✅ **Verified HR Emails (via Hunter.io):**\n${emailsFound.join("\n")}\n${patternInfo}\n\n`;
-  } else {
-    response += `📧 **Standard Recruiter Inbox Aliases:**\n` + standardAliases.map(a => `• \`${a}\``).join("\n") + `\n\n`;
+  // 4. Format Output Response
+  let response = `🔎 **HR & Recruiter Finder for ${capitalizedCompany} (\`${cleanDomain}\`)**\n\n`;
+
+  if (emailPermutations.length > 0) {
+    response += `👤 **Generated Recruiter Email Patterns for ${recruiterName}:**\n`;
+    emailPermutations.forEach(e => response += `• \`${e}\`\n`);
+    response += `\n`;
   }
 
-  response += `🔎 **Find Recruiter Profiles on LinkedIn:**\n[Click here to search ${domain} recruiters on LinkedIn](${linkedinXrayUrl})`;
+  response += `📧 **Standard Recruiter & Talent Inboxes:**\n`;
+  standardInboxes.forEach(a => response += `• \`${a}\`\n`);
+  response += `\n`;
+
+  response += `🔗 **Instant 1-Click Recruiter Finder Links:**\n`;
+  response += `• 👔 [Find ${capitalizedCompany} Recruiters on LinkedIn](${linkedinSearchUrl})\n`;
+  response += `• 🐦 [Find Live Hiring Tweets on X/Twitter](${twitterSearchUrl})\n`;
+  response += `• 🔍 [Search Public Recruiter Emails on Google](${googleEmailSearchUrl})\n`;
 
   return response;
 }
