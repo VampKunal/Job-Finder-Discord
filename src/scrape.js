@@ -11,7 +11,8 @@ import { fetchATSJobs } from "./sources/ats.js";
 import { fetchRemotiveJobs } from "./sources/remotive.js";
 import { fetchJobicyJobs } from "./sources/jobicy.js";
 import { fetchGitHubInternships } from "./sources/github_internships.js";
-import { fetchGmailAlertJobs } from "./sources/gmail_alerts.js";
+import { fetchLinkedInJobs } from "./sources/linkedin.js";
+import { fetchWellfoundJobs } from "./sources/wellfound.js";
 import { filterJobs } from "./filter.js";
 import { deduplicateJobs } from "./dedup.js";
 import { scoreJobForCandidates } from "./score.js";
@@ -24,6 +25,8 @@ async function main() {
 
   // 1. Fetch from all sources concurrently
   const fetchers = [
+    { name: "LinkedIn Public", fn: fetchLinkedInJobs },
+    { name: "Wellfound (AngelList)", fn: fetchWellfoundJobs },
     { name: "RemoteOK", fn: fetchRemoteOKJobs },
     { name: "Himalayas", fn: fetchHimalayasJobs },
     { name: "Arbeitnow", fn: fetchArbeitnowJobs },
@@ -31,8 +34,7 @@ async function main() {
     { name: "Remotive", fn: fetchRemotiveJobs },
     { name: "Jobicy", fn: fetchJobicyJobs },
     { name: "GitHub Open Internships", fn: fetchGitHubInternships },
-    { name: "ATS (Greenhouse/Lever 35+ Companies)", fn: fetchATSJobs },
-    { name: "Gmail Alerts (Naukri/Indeed/LinkedIn)", fn: fetchGmailAlertJobs },
+    { name: "ATS (Greenhouse/Lever 38+ Companies)", fn: fetchATSJobs },
   ];
 
   const rawJobs = [];
