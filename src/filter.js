@@ -1,57 +1,110 @@
 /**
- * Multi-Candidate Keyword & Ghost-Listing Filter logic
+ * Multi-Candidate Keyword, Location Eligibility & Ghost-Listing Filter logic
  */
 
 import { loadProfiles } from "./score.js";
 
-const DEFAULT_KEYWORDS = ["intern", "internship", "junior", "entry-level", "entry level", "fresher", "graduate", "trainee", "associate", "early career", "new grad", "0-1", "0-2", "engineer", "developer"];
-const DEFAULT_EXCLUDE = ["senior", "staff", "principal", "lead", "architect", "manager", "director", "vp", "head of", "10+ years", "8+ years", "5+ years"];
+const MANDATORY_TECH_TITLE_KEYWORDS = [
+  "software", "developer", "engineer", "frontend", "front-end", "backend", "back-end",
+  "fullstack", "full-stack", "web", "ai", "ml", "machine learning", "data science",
+  "deep learning", "computer vision", "nlp", "python", "react", "node", "java", "c++",
+  "cpp", "golang", "cloud", "devops", "intern", "internship"
+];
+
+const NON_TECH_TITLE_EXCLUSIONS = [
+  "accounting", "accountant", "auditor", "hr generalist", "recruiter", "human resources",
+  "sales", "business development", "marketing", "copywriter", "logistics", "legal",
+  "graphic designer", "office manager", "receptionist", "customer service",
+  "financial analyst", "executive assistant", "steuerfachangestellter", "bilanzbuchhalter",
+  "projektkoordinator", "vertriebsmitarbeiter", "mediengestalter", "teamleiter", "pflege"
+];
+
+const NON_ENGLISH_GERMAN_MARKERS = [
+  "(m/w/d)", "all genders", "teilzeit", "vollzeit", "münchen", "personalberatung",
+  "systemhaus", "gesellschaften", "mitarbeiter"
+];
+
+const FOREIGN_LOCATION_RESTRICTIONS = [
+  "us only", "united states only", "usa only", "us & canada", "us/canada",
+  "eu only", "europe only", "uk only", "canada only", "germany only", "latam only",
+  "must reside in us", "must reside in the us", "must be in us", "us citizen",
+  "us timezone"
+];
+
+const FOREIGN_ONSITE_CITIES = [
+  "san francisco", "new york", "austin", "seattle", "chicago", "boston",
+  "london", "munich", "münchen", "berlin", "hamburg", "frankfurt", "paris",
+  "toronto", "vancouver", "sydney", "melbourne"
+];
+
+const DEFAULT_EXCLUDE = [
+  "senior", "staff", "principal", "lead", "architect", "manager", "director",
+  "vp", "head of", "10+ years", "8+ years", "5+ years"
+];
 
 /**
- * Build aggregated roles and skills search list across all candidate profiles
+ * Check if job is tech-relevant and appropriate for candidate experience levels
  */
-function getAggregatedSearchTerms() {
-  const profiles = loadProfiles();
-  const roles = new Set(["software", "frontend", "backend", "fullstack", "full-stack", "web", "developer", "engineer"]);
-  const keywords = new Set(DEFAULT_KEYWORDS);
+export function matchesKeywords(job) {
+  const titleLower = (job.title || "").toLowerCase();
+  const textLower = `${job.title} ${job.description}`.toLowerCase();
 
-  profiles.forEach(p => {
-    if (p.role) {
-      p.role.split(/[\/,]/).forEach(r => roles.add(r.trim().toLowerCase()));
-    }
-    if (Array.isArray(p.skills)) {
-      p.skills.forEach(s => roles.add(s.trim().toLowerCase()));
-    }
-  });
+  // 1. Exclude Senior / Lead / Manager roles
+  if (DEFAULT_EXCLUDE.some(e => textLower.includes(e))) {
+    return false;
+  }
 
-  return {
-    roles: Array.from(roles).filter(Boolean),
-    keywords: Array.from(keywords)
-  };
+  // 2. Exclude Non-Tech roles (HR, Accounting, Sales, etc.)
+  if (NON_TECH_TITLE_EXCLUSIONS.some(e => titleLower.includes(e))) {
+    return false;
+  }
+
+  // 3. Exclude Non-English / German listings
+  if (NON_ENGLISH_GERMAN_MARKERS.some(m => titleLower.includes(m))) {
+    return false;
+  }
+
+  // 4. Require at least one core Tech / Software / AI keyword in title
+  const isTechTitle = MANDATORY_TECH_TITLE_KEYWORDS.some(k => titleLower.includes(k));
+  if (!isTechTitle) {
+    return false;
+  }
+
+  return true;
 }
 
 /**
- * Check if a job matches keyword/role rules for at least one candidate profile
+ * Filter out foreign non-remote or restricted remote jobs for candidates in India
  */
-export function matchesKeywords(job) {
-  const text = `${job.title} ${job.description}`.toLowerCase();
+export function isLocationEligible(job) {
+  const locLower = (job.location || "").toLowerCase();
+  const textLower = `${job.title} ${job.location} ${job.description}`.toLowerCase();
 
-  const isExcluded = DEFAULT_EXCLUDE.some(e => text.includes(e.toLowerCase()));
-  if (isExcluded) return false;
+  // 1. Check for explicit foreign-only remote restrictions
+  const hasRestriction = FOREIGN_LOCATION_RESTRICTIONS.some(r => textLower.includes(r));
+  if (hasRestriction) {
+    // If it says "US Only" but doesn't mention India or Worldwide, exclude it
+    if (!textLower.includes("india") && !textLower.includes("worldwide")) {
+      return false;
+    }
+  }
 
-  const { roles, keywords } = getAggregatedSearchTerms();
+  // 2. Check for foreign on-site locations without remote / India option
+  const isForeignCity = FOREIGN_ONSITE_CITIES.some(city => locLower.includes(city));
+  const isRemoteOrIndia = /remote|worldwide|anywhere|global|india/i.test(locLower) || /remote (worldwide|anywhere|global)/i.test(textLower);
 
-  const hasRole = roles.some(r => text.includes(r.toLowerCase()));
-  const hasKeyword = keywords.some(k => text.includes(k.toLowerCase()));
+  if (isForeignCity && !isRemoteOrIndia) {
+    return false;
+  }
 
-  return hasRole && hasKeyword;
+  return true;
 }
 
 /**
  * Rule-based Ghost-Listing filter
  */
 export function isGhostListing(job) {
-  if (!job.description || job.description.trim().length < 200) {
+  if (!job.description || job.description.trim().length < 150) {
     return true; // Vague or missing JD
   }
 
@@ -59,8 +112,8 @@ export function isGhostListing(job) {
     const postedDate = new Date(job.date);
     if (!isNaN(postedDate.getTime())) {
       const ageDays = (Date.now() - postedDate.getTime()) / (1000 * 60 * 60 * 24);
-      if (ageDays > 30) {
-        return true; // Stale posting (older than 30 days)
+      if (ageDays > 45) {
+        return true; // Stale posting (older than 45 days)
       }
     }
   }
@@ -69,12 +122,14 @@ export function isGhostListing(job) {
 }
 
 /**
- * Filter an array of jobs using keyword rules & ghost filter
+ * Filter an array of jobs using keyword rules, location rules & ghost filter
  */
 export function filterJobs(jobs) {
   return jobs.filter(job => {
     if (isGhostListing(job)) return false;
     if (!matchesKeywords(job)) return false;
+    if (!isLocationEligible(job)) return false;
     return true;
   });
 }
+

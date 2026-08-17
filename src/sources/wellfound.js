@@ -1,7 +1,4 @@
-/**
- * Wellfound (formerly AngelList) Startup Jobs Fetcher
- * Uses Jina Reader / RSS to safely fetch fresh startup job listings
- */
+import crypto from "crypto";
 
 export async function fetchWellfoundJobs() {
   try {
@@ -24,18 +21,18 @@ export async function fetchWellfoundJobs() {
         if (!res.ok) continue;
 
         const text = await res.text();
-        // Parse markdown text returned by Jina Reader for Wellfound
         const lines = text.split("\n");
         let currentJob = null;
 
         for (const line of lines) {
           const trimmed = line.trim();
-          // Look for Markdown headers or links representing job titles
           if (trimmed.startsWith("### ") || trimmed.startsWith("## ")) {
             if (currentJob && currentJob.title) jobs.push(currentJob);
+            const titleClean = trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, "");
+            const stableHash = crypto.createHash("md5").update(`wf_${titleClean}`).digest("hex").substring(0, 12);
             currentJob = {
-              id: `wf-${Math.random().toString(36).substring(7)}`,
-              title: trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, ""),
+              id: `wf-${stableHash}`,
+              title: titleClean,
               company: "Wellfound Startup",
               link: "https://wellfound.com/jobs",
               location: "Remote / India",
@@ -57,3 +54,4 @@ export async function fetchWellfoundJobs() {
     return [];
   }
 }
+

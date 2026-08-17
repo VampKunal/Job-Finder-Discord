@@ -31,16 +31,22 @@ Provide output in 2 formats:
 2. 📧 **Direct Cold Email to Recruiter/Engineer** (100 words max, punchy hook, mentioning key relevant projects, clear CTA).
 `;
 
-  try {
-    const res = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 400,
-      temperature: 0.3,
-    });
+  const models = ["qwen/qwen3.6-27b", "groq/compound-mini", "groq/compound"];
+  for (const modelId of models) {
+    try {
+      const res = await groq.chat.completions.create({
+        model: modelId,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 400,
+        temperature: 0.3,
+      });
 
-    return res.choices[0]?.message?.content || "Could not generate outreach message.";
-  } catch (err) {
-    return `Error generating outreach message: ${err.message}`;
+      if (res.choices[0]?.message?.content) {
+        return res.choices[0].message.content;
+      }
+    } catch (err) {}
   }
+
+  return "Could not generate outreach message using available LLM models.";
 }
+

@@ -38,16 +38,22 @@ Provide a structured Markdown breakdown:
 3. 💡 **Quick Resume Tweak Advice**: 2 actionable bullets on how to tailor candidate's resume for this specific role.
 `;
 
-  try {
-    const res = await groq.chat.completions.create({
-      model: "llama-3.1-8b-instant",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 500,
-      temperature: 0.3,
-    });
+  const models = ["qwen/qwen3.6-27b", "groq/compound-mini", "groq/compound"];
+  for (const modelId of models) {
+    try {
+      const res = await groq.chat.completions.create({
+        model: modelId,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+        temperature: 0.3,
+      });
 
-    return res.choices[0]?.message?.content || "Could not generate skill gap analysis.";
-  } catch (err) {
-    return `Error generating gap analysis: ${err.message}`;
+      if (res.choices[0]?.message?.content) {
+        return res.choices[0].message.content;
+      }
+    } catch (err) {}
   }
+
+  return "Could not generate skill gap analysis using available LLM models.";
 }
+

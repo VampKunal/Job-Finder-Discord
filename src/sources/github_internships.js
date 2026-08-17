@@ -1,7 +1,4 @@
-/**
- * Community-Maintained GitHub Open Internships Feed Fetcher
- * Dataset: SimplifyJobs / PittAPI Software Engineering Internships
- */
+import crypto from "crypto";
 
 export async function fetchGitHubInternships() {
   try {
@@ -29,8 +26,10 @@ export async function fetchGitHubInternships() {
       const locations = Array.isArray(item.locations) ? item.locations.join(", ") : (item.locations || "Remote / Unspecified");
       const datePosted = item.date_posted ? new Date(item.date_posted * 1000).toISOString() : new Date().toISOString();
 
+      const stableHash = crypto.createHash("md5").update(`${company}_${title}_${item.url}`).digest("hex").substring(0, 12);
+
       return {
-        id: `gh-intern-${item.id || Math.random().toString(36).substring(7)}`,
+        id: `gh-intern-${item.id || stableHash}`,
         title: title,
         company: company,
         link: item.url,
@@ -45,3 +44,4 @@ export async function fetchGitHubInternships() {
     return [];
   }
 }
+
