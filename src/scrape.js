@@ -1,5 +1,5 @@
 /**
- * Main Orchestrator Script for Job Discovery Bot (Multi-Candidate Support)
+ * Main Orchestrator Script for Job Discovery Bot (Multi-Source + Multi-Candidate Support)
  */
 
 import "dotenv/config";
@@ -8,6 +8,10 @@ import { fetchHimalayasJobs } from "./sources/himalayas.js";
 import { fetchArbeitnowJobs } from "./sources/arbeitnow.js";
 import { fetchWWRJobs } from "./sources/wwr.js";
 import { fetchATSJobs } from "./sources/ats.js";
+import { fetchRemotiveJobs } from "./sources/remotive.js";
+import { fetchJobicyJobs } from "./sources/jobicy.js";
+import { fetchGitHubInternships } from "./sources/github_internships.js";
+import { fetchGmailAlertJobs } from "./sources/gmail_alerts.js";
 import { filterJobs } from "./filter.js";
 import { deduplicateJobs } from "./dedup.js";
 import { scoreJobForCandidates } from "./score.js";
@@ -18,13 +22,17 @@ async function main() {
   console.log(`[Job Bot] Discovery Cycle Started: ${new Date().toISOString()}`);
   console.log(`====================================================`);
 
-  // 1. Fetch from all Tier-1 sources concurrently
+  // 1. Fetch from all sources concurrently
   const fetchers = [
     { name: "RemoteOK", fn: fetchRemoteOKJobs },
     { name: "Himalayas", fn: fetchHimalayasJobs },
     { name: "Arbeitnow", fn: fetchArbeitnowJobs },
     { name: "WeWorkRemotely", fn: fetchWWRJobs },
-    { name: "ATS (Greenhouse/Lever)", fn: fetchATSJobs },
+    { name: "Remotive", fn: fetchRemotiveJobs },
+    { name: "Jobicy", fn: fetchJobicyJobs },
+    { name: "GitHub Open Internships", fn: fetchGitHubInternships },
+    { name: "ATS (Greenhouse/Lever 35+ Companies)", fn: fetchATSJobs },
+    { name: "Gmail Alerts (Naukri/Indeed/LinkedIn)", fn: fetchGmailAlertJobs },
   ];
 
   const rawJobs = [];
@@ -40,7 +48,7 @@ async function main() {
     }
   });
 
-  console.log(`\n[Summary] Total raw jobs collected: ${rawJobs.length}`);
+  console.log(`\n[Summary] Total raw jobs collected across all sources: ${rawJobs.length}`);
 
   // 2. Multi-Candidate Keyword & Ghost listing filtering
   const filteredJobs = filterJobs(rawJobs);
