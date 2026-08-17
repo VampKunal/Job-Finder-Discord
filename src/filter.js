@@ -1,28 +1,49 @@
 /**
- * Keyword & Ghost-Listing Filter logic
+ * Multi-Candidate Keyword & Ghost-Listing Filter logic
  */
 
+import { loadProfiles } from "./score.js";
+
 const DEFAULT_KEYWORDS = ["intern", "internship", "junior", "entry-level", "entry level", "fresher", "graduate", "trainee", "associate", "early career", "new grad", "0-1", "0-2", "engineer", "developer"];
-const DEFAULT_ROLES = ["software", "frontend", "backend", "fullstack", "full-stack", "full stack", "web", "python", "node", "react", "javascript", "typescript", "java", "golang", "ai", "ml", "data engineer"];
 const DEFAULT_EXCLUDE = ["senior", "staff", "principal", "lead", "architect", "manager", "director", "vp", "head of", "10+ years", "8+ years", "5+ years"];
 
 /**
- * Check if a job matches keyword/role rules and is not explicitly excluded
+ * Build aggregated roles and skills search list across all candidate profiles
  */
-export function matchesKeywords(job, options = {}) {
+function getAggregatedSearchTerms() {
+  const profiles = loadProfiles();
+  const roles = new Set(["software", "frontend", "backend", "fullstack", "full-stack", "web", "developer", "engineer"]);
+  const keywords = new Set(DEFAULT_KEYWORDS);
+
+  profiles.forEach(p => {
+    if (p.role) {
+      p.role.split(/[\/,]/).forEach(r => roles.add(r.trim().toLowerCase()));
+    }
+    if (Array.isArray(p.skills)) {
+      p.skills.forEach(s => roles.add(s.trim().toLowerCase()));
+    }
+  });
+
+  return {
+    roles: Array.from(roles).filter(Boolean),
+    keywords: Array.from(keywords)
+  };
+}
+
+/**
+ * Check if a job matches keyword/role rules for at least one candidate profile
+ */
+export function matchesKeywords(job) {
   const text = `${job.title} ${job.description}`.toLowerCase();
 
-  const roles = options.roles || DEFAULT_ROLES;
-  const keywords = options.keywords || DEFAULT_KEYWORDS;
-  const excludes = options.excludes || DEFAULT_EXCLUDE;
-
-  const isExcluded = excludes.some(e => text.includes(e.toLowerCase()));
+  const isExcluded = DEFAULT_EXCLUDE.some(e => text.includes(e.toLowerCase()));
   if (isExcluded) return false;
+
+  const { roles, keywords } = getAggregatedSearchTerms();
 
   const hasRole = roles.some(r => text.includes(r.toLowerCase()));
   const hasKeyword = keywords.some(k => text.includes(k.toLowerCase()));
 
-  // Role must match, and if specified, level keyword should match if present or if the title is generally targetable
   return hasRole && hasKeyword;
 }
 

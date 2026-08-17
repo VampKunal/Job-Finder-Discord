@@ -1,0 +1,9 @@
+{
+  "name": "Kunal",
+  "role": "Frontend / Full Stack / Software Engineer",
+  "level": "Intern / Entry-Level / Junior / Fresher",
+  "skills": ["JavaScript", "TypeScript", "React", "Node.js", "Express", "Python", "Tailwind CSS", "REST APIs", "Git"],
+  "projects": ["Job Finder Discord Bot", "Learning Platform AI Agent", "E-commerce Wishlist Integration"],
+  "location": "India",
+  "remotePreference": "Open to worldwide remote internships or India-based roles"
+}

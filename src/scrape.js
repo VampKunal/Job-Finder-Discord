@@ -1,5 +1,5 @@
 /**
- * Main Orchestrator Script for Job Discovery Bot (Phase 1)
+ * Main Orchestrator Script for Job Discovery Bot (Multi-Candidate Support)
  */
 
 import "dotenv/config";
@@ -10,12 +10,12 @@ import { fetchWWRJobs } from "./sources/wwr.js";
 import { fetchATSJobs } from "./sources/ats.js";
 import { filterJobs } from "./filter.js";
 import { deduplicateJobs } from "./dedup.js";
-import { scoreJob } from "./score.js";
+import { scoreJobForCandidates } from "./score.js";
 import { pushToDiscord } from "./discord.js";
 
 async function main() {
   console.log(`====================================================`);
-  console.log(`[Job Bot] Phase 1 Discovery Cycle Started: ${new Date().toISOString()}`);
+  console.log(`[Job Bot] Discovery Cycle Started: ${new Date().toISOString()}`);
   console.log(`====================================================`);
 
   // 1. Fetch from all Tier-1 sources concurrently
@@ -42,7 +42,7 @@ async function main() {
 
   console.log(`\n[Summary] Total raw jobs collected: ${rawJobs.length}`);
 
-  // 2. Keyword & Ghost listing filtering
+  // 2. Multi-Candidate Keyword & Ghost listing filtering
   const filteredJobs = filterJobs(rawJobs);
   console.log(`[Filter] Jobs remaining after keyword & ghost filter: ${filteredJobs.length}`);
 
@@ -60,10 +60,10 @@ async function main() {
     return;
   }
 
-  // 4. LLM Relevance Scoring & Discord Push
+  // 4. Multi-Candidate LLM Relevance Scoring & Discord Push
   let pushedCount = 0;
   for (const job of newJobs) {
-    const scoreObj = await scoreJob(job);
+    const scoreObj = await scoreJobForCandidates(job);
     const pushed = await pushToDiscord(job, scoreObj);
     if (pushed) pushedCount++;
   }

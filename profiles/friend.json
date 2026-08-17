@@ -1,0 +1,9 @@
+{
+  "name": "Friend",
+  "role": "Backend / Data / Python Developer",
+  "level": "Intern / Entry-Level / Junior",
+  "skills": ["Python", "FastAPI", "Django", "PostgreSQL", "Docker", "Machine Learning", "Data Analysis"],
+  "projects": ["RAG Quiz Engine", "FastAPI Microservices", "Data Pipeline Scraper"],
+  "location": "India",
+  "remotePreference": "Open to worldwide remote internships or India-based roles"
+}
