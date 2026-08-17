@@ -1,0 +1,16 @@
+{
+  "name": "job-listing-bot",
+  "version": "1.0.0",
+  "description": "Job/Internship Discovery Bot — Tier 1 APIs, Upstash Redis Dedup, Groq AI Scoring & Discord Push",
+  "main": "src/scrape.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/scrape.js"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.34.3",
+    "dotenv": "^16.4.7",
+    "groq-sdk": "^0.15.0",
+    "rss-parser": "^3.13.0"
+  }
+}

@@ -1,0 +1,31 @@
+name: Job Bot
+
+on:
+  schedule:
+    - cron: "17 */2 * * *"   # Runs every 2 hours (offset to avoid top-of-hour GitHub Actions queue congestion)
+  workflow_dispatch:           # Allows manual run from GitHub UI anytime
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Job Discovery Bot
+        run: node src/scrape.js
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+          MIN_SCORE_THRESHOLD: ${{ secrets.MIN_SCORE_THRESHOLD }}

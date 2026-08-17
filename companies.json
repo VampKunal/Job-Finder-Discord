@@ -1,0 +1,10 @@
+[
+  { "name": "Stripe", "greenhouse": "stripe" },
+  { "name": "Notion", "greenhouse": "notion" },
+  { "name": "Linear", "lever": "linear" },
+  { "name": "Vercel", "lever": "vercel" },
+  { "name": "Postman", "greenhouse": "postman" },
+  { "name": "Figma", "greenhouse": "figma" },
+  { "name": "Cloudflare", "greenhouse": "cloudflare" },
+  { "name": "Zapier", "lever": "zapier" }
+]
