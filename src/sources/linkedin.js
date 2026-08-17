@@ -8,8 +8,13 @@ import * as cheerio from "cheerio";
 export async function fetchLinkedInJobs() {
   const searchQueries = [
     { keywords: "software intern", location: "India" },
-    { keywords: "full stack developer", location: "Remote" },
-    { keywords: "ai ml intern", location: "Remote" }
+    { keywords: "full stack developer fresher", location: "India" },
+    { keywords: "ai ml intern", location: "Remote" },
+    { keywords: "web developer intern", location: "India" },
+    { keywords: "python developer fresher", location: "India" },
+    { keywords: "react developer junior", location: "Remote" },
+    { keywords: "software engineer entry level", location: "Remote" },
+    { keywords: "backend developer intern", location: "India" }
   ];
 
   const jobs = [];

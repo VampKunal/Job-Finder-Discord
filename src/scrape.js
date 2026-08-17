@@ -1,5 +1,6 @@
 /**
- * Main Orchestrator Script for Job Discovery Bot (Multi-Source + Multi-Candidate Support)
+ * Main Orchestrator Script for Job Discovery Bot
+ * 17 Sources: Job Boards + ATS + Social/Community + India-Specific
  */
 
 import "dotenv/config";
@@ -13,6 +14,13 @@ import { fetchJobicyJobs } from "./sources/jobicy.js";
 import { fetchGitHubInternships } from "./sources/github_internships.js";
 import { fetchLinkedInJobs } from "./sources/linkedin.js";
 import { fetchWellfoundJobs } from "./sources/wellfound.js";
+import { fetchHNHiringJobs } from "./sources/hn_hiring.js";
+import { fetchRedditJobs } from "./sources/reddit_jobs.js";
+import { fetchIndeedRSSJobs } from "./sources/indeed_rss.js";
+import { fetchInternshalaJobs } from "./sources/internshala.js";
+import { fetchUnstopJobs } from "./sources/unstop.js";
+import { fetchDevToJobs } from "./sources/devto_jobs.js";
+import { fetchJustRemoteJobs } from "./sources/justremote.js";
 import { filterJobs } from "./filter.js";
 import { deduplicateJobs } from "./dedup.js";
 import { scoreJobForCandidates } from "./score.js";
@@ -33,8 +41,15 @@ async function main() {
     { name: "WeWorkRemotely", fn: fetchWWRJobs },
     { name: "Remotive", fn: fetchRemotiveJobs },
     { name: "Jobicy", fn: fetchJobicyJobs },
-    { name: "GitHub Open Internships", fn: fetchGitHubInternships },
-    { name: "ATS (Greenhouse/Lever 38+ Companies)", fn: fetchATSJobs },
+    { name: "GitHub Internships", fn: fetchGitHubInternships },
+    { name: "ATS (Greenhouse/Lever 68 Companies)", fn: fetchATSJobs },
+    { name: "HN Who's Hiring", fn: fetchHNHiringJobs },
+    { name: "Reddit Jobs", fn: fetchRedditJobs },
+    { name: "Indeed RSS", fn: fetchIndeedRSSJobs },
+    { name: "Internshala", fn: fetchInternshalaJobs },
+    { name: "Unstop", fn: fetchUnstopJobs },
+    { name: "Dev.to", fn: fetchDevToJobs },
+    { name: "JustRemote + Freshersworld", fn: fetchJustRemoteJobs },
   ];
 
   const rawJobs = [];
@@ -46,22 +61,22 @@ async function main() {
       console.log(`[Source] ${sourceName}: fetched ${result.value.length} jobs.`);
       rawJobs.push(...result.value);
     } else {
-      console.error(`[Source] ${sourceName}: failed with error -> ${result.reason}`);
+      console.error(`[Source] ${sourceName}: failed -> ${result.reason}`);
     }
   });
 
-  console.log(`\n[Summary] Total raw jobs collected across all sources: ${rawJobs.length}`);
+  console.log(`\n[Summary] Total raw jobs across ${fetchers.length} sources: ${rawJobs.length}`);
 
-  // 2. Multi-Candidate Keyword & Ghost listing filtering
+  // 2. Entry-level keyword, location eligibility & ghost listing filtering
   const filteredJobs = filterJobs(rawJobs);
-  console.log(`[Filter] Jobs remaining after keyword & ghost filter: ${filteredJobs.length}`);
+  console.log(`[Filter] Jobs remaining after filter: ${filteredJobs.length}`);
 
   if (filteredJobs.length === 0) {
-    console.log("[Job Bot] No matching fresh jobs found in this run. Exiting.");
+    console.log("[Job Bot] No matching fresh jobs found. Exiting.");
     return;
   }
 
-  // 3. Deduplication (Upstash Redis)
+  // 3. Deduplication (Upstash Redis + title/company hash)
   const newJobs = await deduplicateJobs(filteredJobs);
   console.log(`[Dedup] New unseen jobs to process: ${newJobs.length}`);
 
@@ -88,3 +103,4 @@ main().catch((err) => {
   console.error(`[Fatal Error] Main loop crashed:`, err);
   process.exit(1);
 });
+
