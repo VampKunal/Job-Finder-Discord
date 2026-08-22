@@ -1,13 +1,14 @@
-name: Job Bot
+name: Job Bot v2
 
 on:
   schedule:
-    - cron: "17 */2 * * *"   # Runs every 2 hours (offset to avoid top-of-hour GitHub Actions queue congestion)
-  workflow_dispatch:           # Allows manual run from GitHub UI anytime
+    - cron: "17 * * * *"        # Runs EVERY HOUR (offset to avoid GitHub queue congestion)
+  workflow_dispatch:              # Allows manual run from GitHub UI anytime
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -21,7 +22,7 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Job Discovery Bot
+      - name: Run India-Fresher-First Job Discovery Bot
         run: node src/scrape.js
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -1,23 +1,49 @@
 /**
- * LinkedIn Public Guest Jobs API Fetcher (Zero-Risk, No Auth Needed)
- * Queries LinkedIn's public guest search endpoint directly
+ * LinkedIn Public Guest Jobs API Fetcher v2
+ * 
+ * Changes from v1:
+ * - ALL queries now target India explicitly
+ * - Added more diverse search terms
+ * - Added 2 "worldwide remote" queries for global remote internships
+ * - Increased query breadth for more coverage
  */
 
 import * as cheerio from "cheerio";
 
 export async function fetchLinkedInJobs() {
   const searchQueries = [
+    // ── India-Explicit Queries ───────────────────────────────────────────
     { keywords: "software intern", location: "India" },
+    { keywords: "software engineer fresher", location: "India" },
     { keywords: "full stack developer fresher", location: "India" },
-    { keywords: "ai ml intern", location: "Remote" },
     { keywords: "web developer intern", location: "India" },
     { keywords: "python developer fresher", location: "India" },
-    { keywords: "react developer junior", location: "Remote" },
-    { keywords: "software engineer entry level", location: "Remote" },
-    { keywords: "backend developer intern", location: "India" }
+    { keywords: "react developer intern", location: "India" },
+    { keywords: "backend developer intern", location: "India" },
+    { keywords: "frontend developer fresher", location: "India" },
+    { keywords: "machine learning intern", location: "India" },
+    { keywords: "data science intern", location: "India" },
+    { keywords: "AI intern", location: "India" },
+    { keywords: "cloud engineer fresher", location: "India" },
+    { keywords: "devops intern", location: "India" },
+    { keywords: "java developer fresher", location: "India" },
+    { keywords: "node.js developer fresher", location: "India" },
+    { keywords: "software trainee", location: "India" },
+    { keywords: "graduate engineer trainee", location: "India" },
+    { keywords: "SDE intern", location: "India" },
+    // ── Specific Indian Cities ───────────────────────────────────────────
+    { keywords: "software intern", location: "Bangalore" },
+    { keywords: "software intern", location: "Hyderabad" },
+    { keywords: "software intern", location: "Pune" },
+    { keywords: "software intern", location: "Delhi NCR" },
+    { keywords: "software intern", location: "Mumbai" },
+    // ── Remote (but India eligible) ──────────────────────────────────────
+    { keywords: "software engineer entry level remote worldwide", location: "India" },
+    { keywords: "intern remote global", location: "India" }
   ];
 
   const jobs = [];
+  const seen = new Set();
 
   for (const q of searchQueries) {
     try {
@@ -48,9 +74,13 @@ export async function fetchLinkedInJobs() {
         if (title && link) {
           const cleanLink = link.split("?")[0]; // Clean tracking params
           const jobId = cleanLink.split("-").pop() || Math.random().toString(36).substring(7);
+          const dedupKey = `linkedin-${jobId}`;
+
+          if (seen.has(dedupKey)) return;
+          seen.add(dedupKey);
 
           jobs.push({
-            id: `linkedin-${jobId}`,
+            id: dedupKey,
             title,
             company: company || "LinkedIn Employer",
             link: cleanLink,
@@ -61,6 +91,9 @@ export async function fetchLinkedInJobs() {
           });
         }
       });
+
+      // Small delay between LinkedIn requests to avoid rate limiting
+      await new Promise(r => setTimeout(r, 300));
 
     } catch (err) {
       console.warn(`[LinkedIn] Fetch error for "${q.keywords}": ${err.message}`);

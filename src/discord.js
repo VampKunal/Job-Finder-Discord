@@ -1,5 +1,6 @@
 /**
- * Discord Webhook Push Notification Module — Multi-Candidate Support
+ * Discord Webhook Push Notification Module v2 — India-Fresher-First
+ * Now shows India eligibility prominently in the embed
  */
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -15,18 +16,18 @@ export async function pushToDiscord(job, scoreObj) {
   const maxScore = scoreObj.maxScore || 0;
 
   if (maxScore < minScore) {
-    console.log(`[Discord] Skipping push for "${job.title}" at ${job.company} (Max Score ${maxScore} < Threshold ${minScore})`);
+    console.log(`[Discord] Skipping "${job.title}" @ ${job.company} (Score ${maxScore} < ${minScore})`);
     return false;
   }
 
-  // Determine color based on highest score among candidates
+  // Determine color based on highest score
   let color = 0xff6644; // Red
   let emoji = "🔴";
   if (maxScore >= 8) {
-    color = 0x00cc66; // Green
+    color = 0x00cc66; // Green — excellent match
     emoji = "🟢";
   } else if (maxScore >= 6) {
-    color = 0xffcc00; // Yellow
+    color = 0xffcc00; // Yellow — good match
     emoji = "🟡";
   }
 
@@ -35,28 +36,41 @@ export async function pushToDiscord(job, scoreObj) {
 
   if (Array.isArray(scoreObj.candidates) && scoreObj.candidates.length > 0) {
     scoreObj.candidates.forEach(c => {
+      const eligIcon = (c.remoteEligible || "").includes("✅") ? "✅" :
+                       (c.remoteEligible || "").includes("❌") ? "❌" : "⚠️";
       fields.push({
         name: `👤 ${c.name} — ${c.score}/10`,
-        value: `**Remote Eligibility:** ${c.remoteEligible || "Unsure"}\n**Match:** ${c.reason || "N/A"}`,
+        value: `${eligIcon} **Eligibility:** ${c.remoteEligible || "Unsure"}\n🎯 **Match:** ${c.reason || "N/A"}`,
         inline: false
       });
     });
   }
 
+  // Determine India eligibility tag for the title
+  const locLower = (job.location || "").toLowerCase();
+  const sourceLower = (job.source || "").toLowerCase();
+  let locationTag = "🌍";
+  if (/india|bangalore|bengaluru|mumbai|delhi|hyderabad|pune|chennai|kolkata|noida|gurgaon/i.test(locLower)
+    || ["internshala", "unstop", "freshersworld", "naukri", "indeed india"].some(s => sourceLower.includes(s))) {
+    locationTag = "🇮🇳";
+  } else if (/worldwide|global|anywhere|remote/i.test(locLower)) {
+    locationTag = "🌐";
+  }
+
   // Meta fields
   fields.push(
-    { name: "📍 Location", value: job.location || "Remote", inline: true },
+    { name: `${locationTag} Location`, value: job.location || "Remote", inline: true },
     { name: "🏷️ Source", value: job.source || "Web", inline: true },
     { name: "📅 Posted", value: job.date ? new Date(job.date).toLocaleDateString() : "Recent", inline: true }
   );
 
   const embed = {
-    title: `${emoji} ${job.title} @ ${job.company}`,
+    title: `${emoji} ${locationTag} ${job.title} @ ${job.company}`,
     url: job.link,
     description: `🎯 **Favored For:** ${scoreObj.bestMatch}\n💡 ${scoreObj.favoredReason}`,
     color: color,
     fields: fields,
-    footer: { text: `ID: ${job.id}` },
+    footer: { text: `Job Bot v2 | India-Fresher-First | ID: ${job.id}` },
     timestamp: new Date().toISOString()
   };
 
@@ -72,9 +86,9 @@ export async function pushToDiscord(job, scoreObj) {
       return false;
     }
 
-    console.log(`[Discord] Pushed: ${job.title} @ ${job.company} [Favors: ${scoreObj.bestMatch} | Max Score: ${maxScore}/10]`);
+    console.log(`[Discord] ✅ Pushed: ${locationTag} ${job.title} @ ${job.company} [${scoreObj.bestMatch} | Score: ${maxScore}/10]`);
 
-    // Respect Discord rate limits with small delay
+    // Respect Discord rate limits
     await sleep(600);
     return true;
   } catch (err) {

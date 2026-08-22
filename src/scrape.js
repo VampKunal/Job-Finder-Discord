@@ -1,6 +1,14 @@
 /**
- * Main Orchestrator Script for Job Discovery Bot
- * 17 Sources: Job Boards + ATS + Social/Community + India-Specific
+ * Main Orchestrator Script for Job Discovery Bot v2
+ * 20 Sources: India-First + Global Remote + ATS + Social/Community
+ * 
+ * Priority Order:
+ *   Tier 1 (India-Explicit): LinkedIn India, Indeed India, Internshala, Unstop,
+ *           Naukri, India Aggregators (Foundit, Shine, TimesJobs), Freshersworld
+ *   Tier 2 (Global Remote): Remotive, RemoteOK, Himalayas, WWR, Arbeitnow,
+ *           Jobicy, JustRemote
+ *   Tier 3 (ATS Direct): Greenhouse/Lever for 80+ companies (Indian unicorns + global)
+ *   Tier 4 (Community): GitHub Internships, HN Hiring, Reddit, Dev.to
  */
 
 import "dotenv/config";
@@ -21,6 +29,8 @@ import { fetchInternshalaJobs } from "./sources/internshala.js";
 import { fetchUnstopJobs } from "./sources/unstop.js";
 import { fetchDevToJobs } from "./sources/devto_jobs.js";
 import { fetchJustRemoteJobs } from "./sources/justremote.js";
+import { fetchNaukriJobs } from "./sources/naukri.js";
+import { fetchIndiaAggregatorJobs } from "./sources/india_aggregators.js";
 import { filterJobs } from "./filter.js";
 import { deduplicateJobs } from "./dedup.js";
 import { scoreJobForCandidates } from "./score.js";
@@ -28,74 +38,107 @@ import { pushToDiscord } from "./discord.js";
 
 async function main() {
   console.log(`====================================================`);
-  console.log(`[Job Bot] Discovery Cycle Started: ${new Date().toISOString()}`);
+  console.log(`[Job Bot v2] 🇮🇳 India-Fresher-First Discovery Cycle`);
+  console.log(`[Job Bot v2] Started: ${new Date().toISOString()}`);
   console.log(`====================================================`);
 
-  // 1. Fetch from all sources concurrently
-  const fetchers = [
-    { name: "LinkedIn Public", fn: fetchLinkedInJobs },
-    { name: "Wellfound (AngelList)", fn: fetchWellfoundJobs },
+  // ── Tier 1: India-Explicit Sources (highest priority) ──────────────
+  const tier1 = [
+    { name: "LinkedIn India (27 queries)", fn: fetchLinkedInJobs },
+    { name: "Indeed India RSS (14 feeds)", fn: fetchIndeedRSSJobs },
+    { name: "Internshala", fn: fetchInternshalaJobs },
+    { name: "Unstop", fn: fetchUnstopJobs },
+    { name: "Naukri RSS (10 feeds)", fn: fetchNaukriJobs },
+    { name: "India Aggregators (Foundit/Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
+    { name: "Wellfound (AngelList India)", fn: fetchWellfoundJobs },
+  ];
+
+  // ── Tier 2: Global Remote Boards (filtered for India eligibility) ──
+  const tier2 = [
+    { name: "Remotive", fn: fetchRemotiveJobs },
     { name: "RemoteOK", fn: fetchRemoteOKJobs },
     { name: "Himalayas", fn: fetchHimalayasJobs },
     { name: "Arbeitnow", fn: fetchArbeitnowJobs },
     { name: "WeWorkRemotely", fn: fetchWWRJobs },
-    { name: "Remotive", fn: fetchRemotiveJobs },
     { name: "Jobicy", fn: fetchJobicyJobs },
-    { name: "GitHub Internships", fn: fetchGitHubInternships },
-    { name: "ATS (Greenhouse/Lever 68 Companies)", fn: fetchATSJobs },
-    { name: "HN Who's Hiring", fn: fetchHNHiringJobs },
-    { name: "Reddit Jobs", fn: fetchRedditJobs },
-    { name: "Indeed RSS", fn: fetchIndeedRSSJobs },
-    { name: "Internshala", fn: fetchInternshalaJobs },
-    { name: "Unstop", fn: fetchUnstopJobs },
-    { name: "Dev.to", fn: fetchDevToJobs },
     { name: "JustRemote + Freshersworld", fn: fetchJustRemoteJobs },
   ];
 
+  // ── Tier 3: ATS Direct (80+ company career pages) ─────────────────
+  const tier3 = [
+    { name: "ATS (Greenhouse/Lever 80+ Companies)", fn: fetchATSJobs },
+  ];
+
+  // ── Tier 4: Community/Social Sources ───────────────────────────────
+  const tier4 = [
+    { name: "GitHub Open Internships", fn: fetchGitHubInternships },
+    { name: "HN Who's Hiring", fn: fetchHNHiringJobs },
+    { name: "Reddit Jobs", fn: fetchRedditJobs },
+    { name: "Dev.to", fn: fetchDevToJobs },
+  ];
+
+  const allFetchers = [...tier1, ...tier2, ...tier3, ...tier4];
   const rawJobs = [];
-  const fetchResults = await Promise.allSettled(fetchers.map(f => f.fn()));
+
+  // ── Run all tiers concurrently ─────────────────────────────────────
+  const fetchResults = await Promise.allSettled(allFetchers.map(f => f.fn()));
+
+  let tierCounts = { tier1: 0, tier2: 0, tier3: 0, tier4: 0 };
 
   fetchResults.forEach((result, idx) => {
-    const sourceName = fetchers[idx].name;
+    const sourceName = allFetchers[idx].name;
     if (result.status === "fulfilled") {
-      console.log(`[Source] ${sourceName}: fetched ${result.value.length} jobs.`);
+      const count = result.value.length;
+      console.log(`[Source] ✅ ${sourceName}: ${count} jobs`);
       rawJobs.push(...result.value);
+
+      if (idx < tier1.length) tierCounts.tier1 += count;
+      else if (idx < tier1.length + tier2.length) tierCounts.tier2 += count;
+      else if (idx < tier1.length + tier2.length + tier3.length) tierCounts.tier3 += count;
+      else tierCounts.tier4 += count;
     } else {
-      console.error(`[Source] ${sourceName}: failed -> ${result.reason}`);
+      console.error(`[Source] ❌ ${sourceName}: ${result.reason}`);
     }
   });
 
-  console.log(`\n[Summary] Total raw jobs across ${fetchers.length} sources: ${rawJobs.length}`);
+  console.log(`\n[Pipeline Summary]`);
+  console.log(`  Tier 1 (India-Explicit): ${tierCounts.tier1} raw jobs`);
+  console.log(`  Tier 2 (Global Remote):  ${tierCounts.tier2} raw jobs`);
+  console.log(`  Tier 3 (ATS Direct):     ${tierCounts.tier3} raw jobs`);
+  console.log(`  Tier 4 (Community):      ${tierCounts.tier4} raw jobs`);
+  console.log(`  TOTAL:                   ${rawJobs.length} raw jobs from ${allFetchers.length} sources\n`);
 
-  // 2. Entry-level keyword, location eligibility & ghost listing filtering
+  // ── 2. India-First Filtering ───────────────────────────────────────
   const filteredJobs = filterJobs(rawJobs);
-  console.log(`[Filter] Jobs remaining after filter: ${filteredJobs.length}`);
+  console.log(`[Filter] Jobs remaining after India-fresher filter: ${filteredJobs.length}`);
 
   if (filteredJobs.length === 0) {
-    console.log("[Job Bot] No matching fresh jobs found. Exiting.");
+    console.log("[Job Bot v2] No matching India-eligible fresh jobs found. Exiting.");
     return;
   }
 
-  // 3. Deduplication (Upstash Redis + title/company hash)
+  // ── 3. Deduplication ──────────────────────────────────────────────
   const newJobs = await deduplicateJobs(filteredJobs);
-  console.log(`[Dedup] New unseen jobs to process: ${newJobs.length}`);
+  console.log(`[Dedup] New unseen jobs: ${newJobs.length}`);
 
   if (newJobs.length === 0) {
-    console.log("[Job Bot] All jobs were previously seen. Exiting.");
+    console.log("[Job Bot v2] All jobs were previously seen. Exiting.");
     return;
   }
 
-  // 4. Multi-Candidate LLM Relevance Scoring & Discord Push
+  // ── 4. LLM Scoring & Discord Push ──────────────────────────────────
   let pushedCount = 0;
+  let skippedCount = 0;
   for (const job of newJobs) {
     const scoreObj = await scoreJobForCandidates(job);
     const pushed = await pushToDiscord(job, scoreObj);
     if (pushed) pushedCount++;
+    else skippedCount++;
   }
 
-  console.log(`====================================================`);
-  console.log(`[Job Bot] Discovery Cycle Finished.`);
-  console.log(`[Job Bot] Pushed ${pushedCount} high-relevance jobs to Discord.`);
+  console.log(`\n====================================================`);
+  console.log(`[Job Bot v2] 🏁 Discovery Cycle Complete`);
+  console.log(`[Job Bot v2] Pushed: ${pushedCount} | Skipped (low score): ${skippedCount}`);
   console.log(`====================================================`);
 }
 
@@ -103,4 +146,3 @@ main().catch((err) => {
   console.error(`[Fatal Error] Main loop crashed:`, err);
   process.exit(1);
 });
-

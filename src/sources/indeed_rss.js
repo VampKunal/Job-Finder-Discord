@@ -1,7 +1,7 @@
 /**
- * Indeed RSS Feed Fetcher
- * Uses Indeed's public RSS endpoint for job searches
- * No auth, no API key — just RSS feeds with targeted queries
+ * Indeed RSS Feed Fetcher v2 — India-Only
+ * Uses Indeed India's RSS endpoint for job searches
+ * No auth, no API key — just RSS feeds with India-targeted queries
  */
 
 import Parser from "rss-parser";
@@ -10,13 +10,22 @@ import crypto from "crypto";
 const parser = new Parser();
 
 const INDEED_FEEDS = [
-  { query: "software intern", location: "india", label: "India Software Intern" },
-  { query: "web developer fresher", location: "india", label: "India Web Dev Fresher" },
-  { query: "machine learning intern", location: "remote", label: "Remote ML Intern" },
-  { query: "software engineer entry level", location: "remote", label: "Remote Entry Level SWE" },
-  { query: "python developer fresher", location: "india", label: "India Python Fresher" },
-  { query: "react developer junior", location: "remote", label: "Remote Junior React" },
-  { query: "full stack intern", location: "india", label: "India Full Stack Intern" }
+  // Indeed India (in.indeed.com)
+  { url: "https://in.indeed.com/rss?q=software+intern&l=india&sort=date&limit=25", label: "India Software Intern" },
+  { url: "https://in.indeed.com/rss?q=web+developer+fresher&l=india&sort=date&limit=25", label: "India Web Dev Fresher" },
+  { url: "https://in.indeed.com/rss?q=python+developer+fresher&l=india&sort=date&limit=25", label: "India Python Fresher" },
+  { url: "https://in.indeed.com/rss?q=full+stack+intern&l=india&sort=date&limit=25", label: "India Full Stack Intern" },
+  { url: "https://in.indeed.com/rss?q=react+developer+fresher&l=india&sort=date&limit=25", label: "India React Fresher" },
+  { url: "https://in.indeed.com/rss?q=machine+learning+intern&l=india&sort=date&limit=25", label: "India ML Intern" },
+  { url: "https://in.indeed.com/rss?q=software+engineer+entry+level&l=india&sort=date&limit=25", label: "India Entry Level SWE" },
+  { url: "https://in.indeed.com/rss?q=data+science+fresher&l=india&sort=date&limit=25", label: "India Data Science" },
+  { url: "https://in.indeed.com/rss?q=java+developer+fresher&l=india&sort=date&limit=25", label: "India Java Fresher" },
+  { url: "https://in.indeed.com/rss?q=backend+developer+intern&l=india&sort=date&limit=25", label: "India Backend Intern" },
+  // City-specific for higher volume
+  { url: "https://in.indeed.com/rss?q=software+intern&l=bangalore&sort=date&limit=25", label: "Bangalore SWE Intern" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=hyderabad&sort=date&limit=25", label: "Hyderabad SWE Intern" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=pune&sort=date&limit=25", label: "Pune SWE Intern" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=delhi&sort=date&limit=25", label: "Delhi SWE Intern" }
 ];
 
 export async function fetchIndeedRSSJobs() {
@@ -25,9 +34,7 @@ export async function fetchIndeedRSSJobs() {
 
   for (const feed of INDEED_FEEDS) {
     try {
-      const url = `https://www.indeed.com/rss?q=${encodeURIComponent(feed.query)}&l=${encodeURIComponent(feed.location)}&sort=date&limit=25`;
-
-      const result = await parser.parseURL(url);
+      const result = await parser.parseURL(feed.url);
       const items = result.items || [];
 
       for (const item of items) {
@@ -45,12 +52,12 @@ export async function fetchIndeedRSSJobs() {
         jobs.push({
           id: `indeed-${hash}`,
           title: title,
-          company: item.source || item.author || "Indeed Employer",
+          company: item.source || item.author || "Indeed India Employer",
           link: link,
-          location: feed.location === "india" ? "India" : "Remote",
-          description: description.length > 50 ? description : `${title}. Found via Indeed RSS (${feed.label}).`,
+          location: "India",
+          description: description.length > 50 ? description : `${title}. Found via Indeed India RSS (${feed.label}).`,
           date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-          source: `Indeed RSS (${feed.label})`
+          source: `Indeed India (${feed.label})`
         });
       }
     } catch (e) {
