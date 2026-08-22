@@ -20,10 +20,10 @@ if (process.env.GROQ_API_KEY) {
 
 // Active Groq models in order of priority
 const GROQ_MODELS = [
-  "qwen/qwen3.6-27b",
-  "groq/compound-mini",
-  "groq/compound",
-  "allam-2-7b"
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "mixtral-8x7b-32768",
+  "deepseek-r1-distill-llama-70b"
 ];
 
 // ─── India eligibility signals ─────────────────────────────────────────
@@ -114,11 +114,44 @@ function getIndiaEligibility(job) {
 }
 
 /**
+ * Helper to normalize and sanitize candidate names to prevent LLM name hallucinations
+ */
+function sanitizeCandidateName(rawName, profiles) {
+  if (!rawName) return profiles[0]?.name || "Candidate";
+  const lower = rawName.toLowerCase();
+  for (const p of profiles) {
+    const firstName = p.name.split(" ")[0].toLowerCase();
+    if (lower.includes(firstName)) {
+      return p.name; // Always return the exact profile name (e.g. "Kunal Rai")
+    }
+  }
+  return profiles[0]?.name || "Candidate";
+}
+
+function sanitizeBestMatch(bestMatchRaw, profiles) {
+  if (!bestMatchRaw) return "Both";
+  const lower = bestMatchRaw.toLowerCase();
+  if (lower.includes("both")) return "Both";
+  if (lower.includes("neither") || lower.includes("none")) return "Neither";
+
+  for (const p of profiles) {
+    const firstName = p.name.split(" ")[0].toLowerCase();
+    if (lower.includes(firstName)) {
+      return p.name;
+    }
+  }
+  return "Both";
+}
+
+/**
  * Smart local heuristic scoring with India-first bias
  */
 export function evaluateHeuristicScoring(job, profiles) {
   const text = `${job.title} ${job.company} ${job.location} ${job.description}`.toLowerCase();
   const eligibility = getIndiaEligibility(job);
+
+  // Experience requirement check: If job requires 2+ years of exp, hard cap score at 2
+  const hasExpReq = /(?:[2-9]|\d{2})\+?\s*(?:years|yrs|yoe)|(?:minimum|at least)\s*[2-9]\s*years/i.test(text);
 
   // ── Location-based score ceiling ──────────────────────────────────────
   let locationCeiling = 10;
@@ -138,9 +171,13 @@ export function evaluateHeuristicScoring(job, profiles) {
       remoteLabel = "⚠️ Ambiguous (No India Confirmation)";
       break;
     case "foreign-restricted":
-      locationCeiling = 2; // Should have been filtered, but safety net
+      locationCeiling = 2; // Safety net
       remoteLabel = "❌ Foreign Restricted";
       break;
+  }
+
+  if (hasExpReq) {
+    locationCeiling = Math.min(locationCeiling, 2);
   }
 
   const candidateScores = profiles.map(p => {
@@ -180,13 +217,17 @@ export function evaluateHeuristicScoring(job, profiles) {
       score += 1;
     }
 
+    if (hasExpReq) {
+      score = 2;
+    }
+
     // ── Apply location ceiling ──────────────────────────────────────────
-    score = Math.min(Math.max(Math.round(score), 2), locationCeiling);
+    score = Math.min(Math.max(Math.round(score), 1), locationCeiling);
 
     const matchedStr = matchedSkills.length > 0 ? matchedSkills.slice(0, 4).join(", ") : "general tech requirements";
 
     return {
-      name: p.name,
+      name: p.name, // Strictly use profile.name
       score,
       remoteEligible: remoteLabel,
       reason: `Matched: ${matchedStr}. Location: ${remoteLabel}.`
@@ -194,8 +235,11 @@ export function evaluateHeuristicScoring(job, profiles) {
   });
 
   const scoresByName = Object.fromEntries(candidateScores.map(c => [c.name, c.score]));
-  const kunalScore = candidateScores.find(c => c.name.toLowerCase().includes("kunal"))?.score || 0;
-  const akshatScore = candidateScores.find(c => c.name.toLowerCase().includes("akshat"))?.score || 0;
+  const kunalProfile = profiles.find(c => c.name.toLowerCase().includes("kunal"));
+  const akshatProfile = profiles.find(c => c.name.toLowerCase().includes("akshat"));
+
+  const kunalScore = kunalProfile ? (scoresByName[kunalProfile.name] || 0) : 0;
+  const akshatScore = akshatProfile ? (scoresByName[akshatProfile.name] || 0) : 0;
 
   let bestMatch = "Neither";
   let favoredReason = "Job did not closely match candidate skill profiles.";
@@ -206,11 +250,11 @@ export function evaluateHeuristicScoring(job, profiles) {
     if (Math.abs(kunalScore - akshatScore) <= 1) {
       bestMatch = "Both";
       favoredReason = "Role aligns equally well with both Full-Stack and AI/ML stacks.";
-    } else if (kunalScore > akshatScore) {
-      bestMatch = candidateScores.find(c => c.name.toLowerCase().includes("kunal"))?.name || "Kunal Rai";
+    } else if (kunalScore > akshatScore && kunalProfile) {
+      bestMatch = kunalProfile.name;
       favoredReason = "Job favors web / full-stack engineering & React/Node stack.";
-    } else {
-      bestMatch = candidateScores.find(c => c.name.toLowerCase().includes("akshat"))?.name || "Akshat Jain";
+    } else if (akshatProfile) {
+      bestMatch = akshatProfile.name;
       favoredReason = "Job favors AI/ML model development & Python/GenAI stack.";
     }
   }
@@ -227,7 +271,7 @@ export async function scoreJobForCandidates(job) {
   const profiles = loadProfiles();
 
   if (profiles.length === 0) {
-    return evaluateHeuristicScoring(job, [{ name: "Candidate", role: "Software Engineer", skills: ["javascript", "python"] }]);
+    return evaluateHeuristicScoring(job, [{ name: "Kunal Rai", role: "Software Engineer", skills: ["javascript", "python"] }]);
   }
 
   // If no Groq API key set, use smart local heuristic evaluation
@@ -236,43 +280,32 @@ export async function scoreJobForCandidates(job) {
   }
 
   const prompt = `
-You are an expert technical recruiter evaluating a job posting for TWO candidates located in INDIA (New Delhi).
-Both candidates are FRESHERS / FINAL-YEAR STUDENTS with ZERO work experience. They can only apply to:
-- Internships
-- Entry-level / fresher roles (0-1 year experience)
-- Roles explicitly open to candidates in India (remote or on-site in India)
+You are an expert technical recruiter evaluating a job posting for candidates located in INDIA.
+Candidates:
+${profiles.map((p, idx) => `[Candidate ${idx + 1}] Name: "${p.name}", Role: "${p.role}", Skills: ${p.skills.join(", ")}`).join("\n")}
 
 CRITICAL RULES:
-1. If the job requires 2+ years of experience → score BOTH candidates 1-3 max.
-2. If the job is US-only, EU-only, UK-only, or requires work authorization outside India → remoteEligible = "No" and score 1-2 max.
-3. If the job location is a foreign city without "Remote" → score 1-2 max.
-4. If the job says "Remote" but mentions only US/EU timezones or locations → score 3-4 max.
-5. If the job explicitly mentions India, Worldwide, Anywhere, or Global → that's excellent, score fairly.
-6. INTERNSHIP or FRESHER roles in INDIA should get the highest possible scores if skills match.
+1. Candidate names must strictly match the exact profile names provided above ("${profiles.map(p => p.name).join('", "')}"). DO NOT alter, hallucinate, or append fake surnames like "Gupta" or "Patel".
+2. If the job requires 2+ years of experience → score ALL candidates 1-3 max.
+3. If the job is US-only, EU-only, UK-only, or requires work authorization outside India → remoteEligible = "No" and score 1-2 max.
+4. If the job location is a foreign city without "Remote" → score 1-2 max.
+5. If the job explicitly mentions India, Worldwide, Anywhere, or Global → score fairly based on skills.
+6. INTERNSHIP or FRESHER roles in INDIA should get high scores if skills match.
 
 Job Details:
 - Title: ${job.title}
 - Company: ${job.company}
 - Location: ${job.location}
 - Source: ${job.source}
-- Job Description Excerpt: ${job.description.slice(0, 800)}
-
-Candidates to evaluate:
-${JSON.stringify(profiles, null, 2)}
-
-Instructions:
-1. Evaluate this job for EACH candidate individually based on their skills, projects, and role focus.
-2. Determine India eligibility (look for location restrictions, timezone requirements, visa requirements).
-3. Assign a Score (1 to 10) for each candidate factoring in BOTH skill match AND India eligibility.
-4. Determine which candidate this job favors.
+- Description Excerpt: ${job.description.slice(0, 800)}
 
 Respond ONLY with valid JSON:
 {
-  "bestMatch": "Name of favored candidate or 'Both' or 'Neither'",
+  "bestMatch": "Exact candidate name (e.g. 'Kunal Rai' or 'Akshat Jain') or 'Both' or 'Neither'",
   "favoredReason": "One short sentence.",
   "candidates": [
     {
-      "name": "Candidate Name",
+      "name": "Exact candidate name from prompt",
       "score": 8,
       "remoteEligible": "Yes (India)" OR "Yes (Worldwide)" OR "No (US Only)" OR "Unsure",
       "reason": "One concise sentence."
@@ -288,25 +321,36 @@ Respond ONLY with valid JSON:
         model: modelId,
         messages: [{ role: "user", content: prompt }],
         max_tokens: 500,
-        temperature: 0.2,
+        temperature: 0.1,
       });
 
       const raw = res.choices[0]?.message?.content?.trim() || "";
-      // Strip reasoning <think>...</think> tags if model produces them
       const noThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
       const match = noThink.match(/\{[\s\S]*\}/);
       if (!match) continue;
 
       const parsed = JSON.parse(match[0]);
 
-      const candidatesList = Array.isArray(parsed.candidates) ? parsed.candidates : [];
-      const maxScore = Math.max(...candidatesList.map(c => c.score || 0), 0);
+      // SANITIZE CANDIDATE NAMES TO PREVENT HALLUCINATIONS
+      const rawCandidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+      const sanitizedCandidates = profiles.map((p, idx) => {
+        const rawC = rawCandidates[idx] || rawCandidates.find(c => (c.name || "").toLowerCase().includes(p.name.split(" ")[0].toLowerCase())) || {};
+        return {
+          name: p.name, // STRICT: ALWAYS use exact candidate profile name!
+          score: typeof rawC.score === "number" ? rawC.score : 4,
+          remoteEligible: rawC.remoteEligible || "Unsure",
+          reason: rawC.reason || "Evaluated by AI model."
+        };
+      });
+
+      const bestMatchSanitized = sanitizeBestMatch(parsed.bestMatch, profiles);
+      const maxScore = Math.max(...sanitizedCandidates.map(c => c.score || 0), 0);
 
       return {
-        bestMatch: parsed.bestMatch || "Both",
+        bestMatch: bestMatchSanitized,
         favoredReason: parsed.favoredReason || "Matched candidate skills.",
         maxScore,
-        candidates: candidatesList
+        candidates: sanitizedCandidates
       };
     } catch (err) {
       console.warn(`[Score] Groq model ${modelId} attempt failed for "${job.title}": ${err.message}`);
@@ -316,3 +360,4 @@ Respond ONLY with valid JSON:
   // Fallback to local heuristic scoring if all Groq models fail
   return evaluateHeuristicScoring(job, profiles);
 }
+

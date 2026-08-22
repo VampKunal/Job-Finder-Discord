@@ -24,10 +24,12 @@ You are an expert tech career coach and resume strategist.
 
 Analyze the following Job Description against the Candidate Resume Profile:
 
-Candidate Profile (${candidate.name}):
+Candidate Profile ("${candidate.name}"):
 - Role: ${candidate.role}
 - Skills: ${candidate.skills?.join(", ")}
 - Key Projects: ${JSON.stringify(candidate.projects)}
+
+CRITICAL: The candidate's name is strictly "${candidate.name}". Do NOT alter or hallucinate surnames.
 
 Job Description:
 ${jobDescription.slice(0, 1200)}
@@ -38,7 +40,13 @@ Provide a structured Markdown breakdown:
 3. 💡 **Quick Resume Tweak Advice**: 2 actionable bullets on how to tailor candidate's resume for this specific role.
 `;
 
-  const models = ["qwen/qwen3.6-27b", "groq/compound-mini", "groq/compound"];
+  const models = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
+    "deepseek-r1-distill-llama-70b"
+  ];
+
   for (const modelId of models) {
     try {
       const res = await groq.chat.completions.create({
@@ -49,7 +57,9 @@ Provide a structured Markdown breakdown:
       });
 
       if (res.choices[0]?.message?.content) {
-        return res.choices[0].message.content;
+        let content = res.choices[0].message.content;
+        content = content.replace(/Kunal\s+(Gupta|Patel|Sharma|Singh|Rai\s+Patel|Gupta\s+Patel)/gi, candidate.name);
+        return content;
       }
     } catch (err) {}
   }

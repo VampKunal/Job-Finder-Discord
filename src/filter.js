@@ -108,17 +108,32 @@ const NON_ENGLISH_MARKERS = [
   "(h/f)", "cdi", "alternance" // French job markers
 ];
 
+// ─── JUNK / NON-JOB SECTION HEADER EXCLUSIONS ──────────────────────────────
+const JUNK_TITLE_EXCLUSIONS = [
+  "privacy policy", "terms of use", "terms of service", "terms & conditions",
+  "cookie policy", "contact us", "about us", "frequently asked", "faq",
+  "login", "sign in", "sign up", "signup", "register", "download app",
+  "popular searches", "top categories", "top cities", "browse jobs",
+  "job search", "jobs in", "internships in", "for employers", "job seekers",
+  "search results", "all rights reserved", "copyright", "why join us",
+  "how to apply", "company overview", "explore opportunities", "view all",
+  "related jobs", "similar jobs"
+];
+
 // ─── SENIORITY EXCLUSIONS (fresher/intern only) ──────────────────────────────
 const SENIORITY_EXCLUSIONS = [
   "senior", "sr.", "sr ", "staff", "principal", "lead", "architect",
   "manager", "director", "vp ", "vice president", "head of", "chief",
   "mid-level", "mid level", "intermediate", "experienced",
   "level ii", "level iii", " level 2", " level 3", " l5", " l6", " l7",
-  "5+ years", "7+ years", "10+ years", "3-5 years", "5-7 years"
+  "sde 2", "sde-2", "sde2", "sde 3", "sde-3", "sde3", "sde ii", "sde-ii", "sde iii", "sde-iii",
+  "software engineer 2", "software engineer ii", "software engineer 3", "software engineer iii",
+  "swe 2", "swe-2", "swe2", "swe 3", "swe-3", "swe3",
+  "5+ years", "7+ years", "10+ years", "3-5 years", "5-7 years", "2+ years", "3+ years"
 ];
 
 // ─── EXPERIENCE REGEX (2+ years = too senior) ───────────────────────────────
-const EXP_REQUIREMENT_REGEX = /(?:minimum|at least|requires?|with)\s*(?:[2-9]|\d{2})\+?\s*(?:years|yrs)\b|(?:[2-9]|\d{2})\+?\s*(?:years|yrs)\s*(?:of)?\s*(?:experience|exp)/i;
+const EXP_REQUIREMENT_REGEX = /(?:[2-9]|\d{2})\+?\s*(?:-\s*[2-9]\d?)?\s*(?:years?|yrs?|yoe)\b|(?:minimum|at least|requires?|with)\s*(?:[2-9]|\d{2})\+?\s*(?:years?|yrs?|yoe)\b|\b[2-9]\s*\+\s*(?:years?|yrs?|yoe)\b/i;
 
 // ─── FRESHER / INTERN BOOST SIGNALS ─────────────────────────────────────────
 const FRESHER_BOOST_KEYWORDS = [
@@ -135,6 +150,11 @@ const FRESHER_BOOST_KEYWORDS = [
 export function matchesKeywords(job) {
   const titleLower = (job.title || "").toLowerCase();
   const textLower = `${job.title} ${job.description}`.toLowerCase();
+
+  // 0. Exclude non-job section headers scraped from website footers/navbars
+  if (JUNK_TITLE_EXCLUSIONS.some(junk => titleLower.includes(junk))) {
+    return false;
+  }
 
   // 1. Exclude Senior / Mid-Level roles
   if (SENIORITY_EXCLUSIONS.some(e => titleLower.includes(e))) {
@@ -202,23 +222,17 @@ export function isLocationEligible(job) {
   }
 
   // ── STEP 6: For purely "Remote" jobs without any geo qualifier ─────────
-  // These are the tricky ones — "Remote" with no country specified.
-  // We allow them ONLY if description doesn't hint at foreign restriction
-  // AND the job explicitly mentions fresher/intern/entry-level (more likely to be open)
-  if (/^remote$/i.test(locLower.trim()) || locLower === "remote / unspecified") {
-    // Check if description has any country-specific timezone or location hints
+  if (/^remote$/i.test(locLower.trim()) || locLower.includes("unspecified")) {
     const hasForeignHint = /\b(us|usa|united states|uk|canada|europe|eu|germany|france|australia)\b/i.test(descLower)
       && !/\bindia\b|\bworldwide\b|\bglobal\b|\banywhere\b/i.test(descLower);
     if (hasForeignHint) {
       return false;
     }
-    // Allow ambiguous "Remote" only if it looks entry-level/intern
     const isFresherJob = FRESHER_BOOST_KEYWORDS.some(k => textLower.includes(k));
-    return isFresherJob; // Ambiguous remote + no fresher signal = reject
+    return isFresherJob;
   }
 
   // ── STEP 7: Default REJECT ─────────────────────────────────────────────
-  // If we can't confirm India eligibility, reject to keep noise down
   return false;
 }
 
@@ -235,7 +249,7 @@ export function isGhostListing(job) {
     if (!isNaN(postedDate.getTime())) {
       const ageDays = (Date.now() - postedDate.getTime()) / (1000 * 60 * 60 * 24);
       if (ageDays > 30) {
-        return true; // Stale posting (tightened from 45 to 30 days)
+        return true;
       }
     }
   }
