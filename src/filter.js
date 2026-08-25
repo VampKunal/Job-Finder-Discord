@@ -144,6 +144,103 @@ const FRESHER_BOOST_KEYWORDS = [
   "entry-level", "junior", "associate"
 ];
 
+// ─── FAKE / SCAM / UNPAID EXCLUSION MARKERS ────────────────────────────────
+const FAKE_AND_UNPAID_MARKERS = [
+  // Unpaid / Zero stipend traps
+  "unpaid", "0 stipend", "zero stipend", "no stipend", "without stipend",
+  "free internship", "volunteer", "un-paid", "pay to learn", "registration fee",
+  "security deposit", "training fee", "buy course", "course fee", "commission only",
+  "100% commission", "pay per lead", "pay per sale", "unpaid internship",
+  "no salary", "performance based stipend only", "stipend: 0", "stipend: rs 0",
+  "stipend - 0", "stipend - rs 0", "stipend : 0", "stipend : rs. 0",
+
+  // Scam / Data Entry / Typing / Copy-Paste fraud
+  "data entry", "form filling", "copy paste", "sms sending", "typing job",
+  "online typing", "captcha typing", "survey taker", "earn money online",
+  "work from home without investment", "part time typing", "packet packing",
+  "handwriting job", "offline data entry", "part-time data entry",
+
+  // Multi-Level Marketing (MLM) & Pyramid Schemes
+  "network marketing", "herbalife", "amway", "forever living", "pyramid scheme",
+  "multilevel marketing", "mlm", "direct selling",
+
+  // Contact via Telegram / WhatsApp recruitment scams
+  "whatsapp us on", "contact on whatsapp", "send resume on whatsapp",
+  "apply via whatsapp", "telegram channel", "t.me/", "msg on telegram",
+  "call hr at", "contact hr on whatsapp", "whatsapp your cv",
+
+  // Fraudulent / Too-good-to-be-true promises
+  "urgent hiring for freshers", "earn up to 50k", "daily payout",
+  "no interview direct joining", "direct joining", "instant hiring without interview",
+  "guaranteed job", "job guarantee fee", "pay us", "training charges",
+  "pay for laptop", "refundable deposit", "processing fee", "documentation charges"
+];
+
+// ─── DELHI-NCR REGION MARKERS (high priority on-site/hybrid location) ────────
+export const DELHI_NCR_MARKERS = [
+  "noida", "gurgaon", "gurugram", "delhi", "new delhi",
+  "greater noida", "ghaziabad", "faridabad", "delhi ncr", "delhi-ncr", "ncr"
+];
+
+/**
+ * Detect fake, scam, unpaid, pay-to-work, or fraudulent job listings
+ */
+export function isFakeJob(job) {
+  const titleLower = (job.title || "").toLowerCase();
+  const descLower = (job.description || "").toLowerCase();
+  const companyLower = (job.company || "").toLowerCase();
+  const textLower = `${titleLower} ${descLower} ${companyLower}`;
+
+  // 1. Check for fake / scam / unpaid keywords
+  if (FAKE_AND_UNPAID_MARKERS.some(marker => textLower.includes(marker))) {
+    return true;
+  }
+
+  // 2. Suspicious company names or placeholder companies
+  const suspiciousCompanies = ["hiring team", "hr department", "job provider", "unknown", "test company", "lorem ipsum"];
+  if (suspiciousCompanies.some(sc => companyLower === sc)) {
+    return true;
+  }
+
+  // 3. Extremely short or boilerplate spam descriptions
+  if (descLower.length < 80) {
+    return true;
+  }
+
+  // 4. Repeated junk phrases or missing real title
+  if (/lorem ipsum|sample text|test title/i.test(textLower)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if job is located in Noida, Gurgaon, Delhi (Delhi-NCR region)
+ */
+export function isDelhiNCRLocation(job) {
+  const locLower = (job.location || "").toLowerCase();
+  const descLower = (job.description || "").toLowerCase();
+  const textLower = `${locLower} ${descLower}`;
+  return DELHI_NCR_MARKERS.some(m => textLower.includes(m));
+}
+
+/**
+ * Check if job is Remote Paid (Remote location + explicitly not unpaid)
+ */
+export function isRemotePaidJob(job) {
+  const locLower = (job.location || "").toLowerCase();
+  const descLower = (job.description || "").toLowerCase();
+  const textLower = `${job.title} ${locLower} ${descLower}`.toLowerCase();
+  
+  const isRemote = /remote|work from home|wfh|worldwide|anywhere|global/i.test(locLower) ||
+                   GLOBAL_REMOTE_MARKERS.some(m => textLower.includes(m));
+  
+  const isUnpaid = FAKE_AND_UNPAID_MARKERS.some(m => textLower.includes(m));
+
+  return isRemote && !isUnpaid;
+}
+
 /**
  * Check if a job title is tech-relevant and fresher/intern level
  */
@@ -258,16 +355,20 @@ export function isGhostListing(job) {
 }
 
 /**
- * Master filter: keyword + location + ghost check
+ * Master filter: ghost check + fake/unpaid check + keyword + location
  */
 export function filterJobs(jobs) {
-  const stats = { total: 0, ghosted: 0, notTech: 0, locationFail: 0, passed: 0 };
+  const stats = { total: 0, ghosted: 0, fakeJobs: 0, notTech: 0, locationFail: 0, passed: 0 };
 
   const result = jobs.filter(job => {
     stats.total++;
 
     if (isGhostListing(job)) {
       stats.ghosted++;
+      return false;
+    }
+    if (isFakeJob(job)) {
+      stats.fakeJobs++;
       return false;
     }
     if (!matchesKeywords(job)) {
@@ -283,6 +384,7 @@ export function filterJobs(jobs) {
     return true;
   });
 
-  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Not-Tech/Senior: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
+  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Tech/Senior: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }
+

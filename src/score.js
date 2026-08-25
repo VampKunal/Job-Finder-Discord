@@ -2,16 +2,16 @@
  * Multi-Candidate Groq LLM Relevance & India-Eligibility Scoring Module v2
  * 
  * Key changes:
- * - Heuristic scoring now HEAVILY penalizes non-India/non-global jobs
- * - Fresher/intern roles get strong boost
- * - India-explicit roles get strong boost
- * - Foreign timezone/onsite hints = hard cap at score 3
- * - LLM prompt is now laser-focused on Indian fresher eligibility
+ * - Delhi NCR (Noida/Gurgaon/Delhi) roles get top location priority boost (+2 points)
+ * - Remote Paid roles get top remote priority boost (+1.5 points)
+ * - Fake / Unpaid / Scam jobs get hard penalty (score 0-2)
+ * - Evaluates individual ratings and skill match for BOTH candidate profiles
  */
 
 import Groq from "groq-sdk";
 import fs from "fs";
 import path from "path";
+import { isDelhiNCRLocation, isRemotePaidJob, isFakeJob } from "./filter.js";
 
 let groq = null;
 if (process.env.GROQ_API_KEY) {
@@ -144,11 +144,27 @@ function sanitizeBestMatch(bestMatchRaw, profiles) {
 }
 
 /**
- * Smart local heuristic scoring with India-first bias
+ * Smart local heuristic scoring with India-first, Delhi-NCR, & Remote-Paid priority
  */
 export function evaluateHeuristicScoring(job, profiles) {
+  if (isFakeJob(job)) {
+    return {
+      bestMatch: "Neither",
+      favoredReason: "Rejected: Suspected fake, scam, or unpaid position.",
+      maxScore: 0,
+      candidates: profiles.map(p => ({
+        name: p.name,
+        score: 0,
+        remoteEligible: "❌ Fake/Unpaid",
+        reason: "Position flagged as unpaid or non-legitimate job."
+      }))
+    };
+  }
+
   const text = `${job.title} ${job.company} ${job.location} ${job.description}`.toLowerCase();
   const eligibility = getIndiaEligibility(job);
+  const isDelhiNCR = isDelhiNCRLocation(job);
+  const isRemotePaid = isRemotePaidJob(job);
 
   // Experience requirement check: If job requires 2+ years of exp, hard cap score at 2
   const hasExpReq = /(?:[2-9]|\d{2})\+?\s*(?:years|yrs|yoe)|(?:minimum|at least)\s*[2-9]\s*years/i.test(text);
@@ -157,23 +173,31 @@ export function evaluateHeuristicScoring(job, profiles) {
   let locationCeiling = 10;
   let remoteLabel = "Unsure";
 
-  switch (eligibility) {
-    case "india-explicit":
-      locationCeiling = 10;
-      remoteLabel = "✅ India (Explicit)";
-      break;
-    case "global-remote":
-      locationCeiling = 9;
-      remoteLabel = "✅ Global Remote";
-      break;
-    case "ambiguous":
-      locationCeiling = 5; // Hard cap — don't let ambiguous jobs rank high
-      remoteLabel = "⚠️ Ambiguous (No India Confirmation)";
-      break;
-    case "foreign-restricted":
-      locationCeiling = 2; // Safety net
-      remoteLabel = "❌ Foreign Restricted";
-      break;
+  if (isDelhiNCR) {
+    locationCeiling = 10;
+    remoteLabel = "📍 Delhi-NCR (Priority)";
+  } else if (isRemotePaid) {
+    locationCeiling = 10;
+    remoteLabel = "🏠💰 Remote Paid (Priority)";
+  } else {
+    switch (eligibility) {
+      case "india-explicit":
+        locationCeiling = 10;
+        remoteLabel = "✅ India (Explicit)";
+        break;
+      case "global-remote":
+        locationCeiling = 9;
+        remoteLabel = "✅ Global Remote";
+        break;
+      case "ambiguous":
+        locationCeiling = 5;
+        remoteLabel = "⚠️ Ambiguous";
+        break;
+      case "foreign-restricted":
+        locationCeiling = 2;
+        remoteLabel = "❌ Foreign Restricted";
+        break;
+    }
   }
 
   if (hasExpReq) {
@@ -212,9 +236,19 @@ export function evaluateHeuristicScoring(job, profiles) {
       score += 1.5;
     }
 
+    // ── PRIORITY BOOST 1: Delhi-NCR Location (Noida / Gurgaon / Delhi) ───
+    if (isDelhiNCR) {
+      score += 2.0;
+    }
+
+    // ── PRIORITY BOOST 2: Remote Paid Job ─────────────────────────────────
+    if (isRemotePaid) {
+      score += 1.5;
+    }
+
     // ── India-explicit boost ────────────────────────────────────────────
     if (eligibility === "india-explicit") {
-      score += 1;
+      score += 0.5;
     }
 
     if (hasExpReq) {
@@ -225,12 +259,13 @@ export function evaluateHeuristicScoring(job, profiles) {
     score = Math.min(Math.max(Math.round(score), 1), locationCeiling);
 
     const matchedStr = matchedSkills.length > 0 ? matchedSkills.slice(0, 4).join(", ") : "general tech requirements";
+    const locNote = isDelhiNCR ? "📍 Delhi-NCR Priority" : isRemotePaid ? "🏠💰 Remote Paid" : remoteLabel;
 
     return {
-      name: p.name, // Strictly use profile.name
+      name: p.name,
       score,
-      remoteEligible: remoteLabel,
-      reason: `Matched: ${matchedStr}. Location: ${remoteLabel}.`
+      remoteEligible: locNote,
+      reason: `Matched: ${matchedStr}. Status: ${locNote}.`
     };
   });
 
@@ -249,19 +284,21 @@ export function evaluateHeuristicScoring(job, profiles) {
   if (maxScore >= 6) {
     if (Math.abs(kunalScore - akshatScore) <= 1) {
       bestMatch = "Both";
-      favoredReason = "Role aligns equally well with both Full-Stack and AI/ML stacks.";
+      favoredReason = "Role aligns equally well with both Kunal (Full-Stack) and Akshat (AI/ML).";
     } else if (kunalScore > akshatScore && kunalProfile) {
       bestMatch = kunalProfile.name;
-      favoredReason = "Job favors web / full-stack engineering & React/Node stack.";
+      favoredReason = "Job favors web / full-stack engineering & React/Node stack (Kunal).";
     } else if (akshatProfile) {
       bestMatch = akshatProfile.name;
-      favoredReason = "Job favors AI/ML model development & Python/GenAI stack.";
+      favoredReason = "Job favors AI/ML model development & Python/GenAI stack (Akshat).";
     }
   }
 
+  const priorityLabel = isDelhiNCR ? "📍 Delhi-NCR" : isRemotePaid ? "🏠💰 Remote Paid" : "Standard";
+
   return {
     bestMatch,
-    favoredReason: `${favoredReason} (Heuristic | ${remoteLabel})`,
+    favoredReason: `${favoredReason} [${priorityLabel}]`,
     maxScore,
     candidates: candidateScores
   };
@@ -279,24 +316,28 @@ export async function scoreJobForCandidates(job) {
     return evaluateHeuristicScoring(job, profiles);
   }
 
-  const prompt = `
-You are an expert technical recruiter evaluating a job posting for candidates located in INDIA.
-Candidates:
-${profiles.map((p, idx) => `[Candidate ${idx + 1}] Name: "${p.name}", Role: "${p.role}", Skills: ${p.skills.join(", ")}`).join("\n")}
+  const isDelhiNCR = isDelhiNCRLocation(job);
+  const isRemotePaid = isRemotePaidJob(job);
 
-CRITICAL RULES:
-1. Candidate names must strictly match the exact profile names provided above ("${profiles.map(p => p.name).join('", "')}"). DO NOT alter, hallucinate, or append fake surnames like "Gupta" or "Patel".
-2. If the job requires 2+ years of experience → score ALL candidates 1-3 max.
-3. If the job is US-only, EU-only, UK-only, or requires work authorization outside India → remoteEligible = "No" and score 1-2 max.
-4. If the job location is a foreign city without "Remote" → score 1-2 max.
-5. If the job explicitly mentions India, Worldwide, Anywhere, or Global → score fairly based on skills.
-6. INTERNSHIP or FRESHER roles in INDIA should get high scores if skills match.
+  const prompt = `
+You are an expert technical recruiter evaluating a job posting for candidates located in DELHI NCR, INDIA.
+Candidates:
+${profiles.map((p, idx) => `[Candidate ${idx + 1}] Name: "${p.name}", Role: "${p.role}", Location: "${p.location || 'Delhi, India'}", Skills: ${p.skills.join(", ")}`).join("\n")}
+
+PRIORITY & SCORING RULES:
+1. Candidate names MUST strictly match exact profile names ("${profiles.map(p => p.name).join('", "')}").
+2. BOTH candidates live in Delhi-NCR. Give a STRONG SCORE BOOST (+2) for jobs in NOIDA, GURGAON / GURUGRAM, DELHI, NEW DELHI, or DELHI-NCR! (Delhi NCR Job = ${isDelhiNCR ? "YES" : "NO"})
+3. Give a STRONG SCORE BOOST (+1.5) for REMOTE PAID jobs! (Remote Paid Job = ${isRemotePaid ? "YES" : "NO"})
+4. REJECT / SCORE 1-2 MAX if the job is UNPAID, Zero Stipend, Scam, Pay-to-work, Data Entry, or fake.
+5. If the job requires 2+ years of experience → score ALL candidates 1-3 max.
+6. Provide an explicit score from 1 to 10 for BOTH candidates.
 
 Job Details:
 - Title: ${job.title}
 - Company: ${job.company}
 - Location: ${job.location}
 - Source: ${job.source}
+- Priority Markers: ${isDelhiNCR ? "📍 Delhi-NCR (Noida/Gurgaon/Delhi)" : ""} ${isRemotePaid ? "🏠💰 Remote Paid" : ""}
 - Description Excerpt: ${job.description.slice(0, 800)}
 
 Respond ONLY with valid JSON:
@@ -307,8 +348,8 @@ Respond ONLY with valid JSON:
     {
       "name": "Exact candidate name from prompt",
       "score": 8,
-      "remoteEligible": "Yes (India)" OR "Yes (Worldwide)" OR "No (US Only)" OR "Unsure",
-      "reason": "One concise sentence."
+      "remoteEligible": "Yes (Delhi NCR)" OR "Yes (Remote Paid)" OR "Yes (India)" OR "No",
+      "reason": "One concise sentence specifying candidate skill match and rating breakdown."
     }
   ]
 }
@@ -331,14 +372,25 @@ Respond ONLY with valid JSON:
 
       const parsed = JSON.parse(match[0]);
 
-      // SANITIZE CANDIDATE NAMES TO PREVENT HALLUCINATIONS
+      // SANITIZE CANDIDATE NAMES & APPLY PRIORITY BOOSTS
       const rawCandidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
       const sanitizedCandidates = profiles.map((p, idx) => {
         const rawC = rawCandidates[idx] || rawCandidates.find(c => (c.name || "").toLowerCase().includes(p.name.split(" ")[0].toLowerCase())) || {};
+        let score = typeof rawC.score === "number" ? rawC.score : 4;
+
+        // Ensure location priority boosts are accounted for
+        if (isDelhiNCR && score >= 5 && score < 10) {
+          score = Math.min(10, score + 1);
+        } else if (isRemotePaid && score >= 5 && score < 10) {
+          score = Math.min(10, score + 1);
+        }
+
+        const elig = isDelhiNCR ? "📍 Delhi-NCR" : isRemotePaid ? "🏠💰 Remote Paid" : (rawC.remoteEligible || "Yes (India)");
+
         return {
-          name: p.name, // STRICT: ALWAYS use exact candidate profile name!
-          score: typeof rawC.score === "number" ? rawC.score : 4,
-          remoteEligible: rawC.remoteEligible || "Unsure",
+          name: p.name,
+          score,
+          remoteEligible: elig,
           reason: rawC.reason || "Evaluated by AI model."
         };
       });
@@ -360,4 +412,5 @@ Respond ONLY with valid JSON:
   // Fallback to local heuristic scoring if all Groq models fail
   return evaluateHeuristicScoring(job, profiles);
 }
+
 

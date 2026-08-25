@@ -36,41 +36,46 @@ export async function pushToDiscord(job, scoreObj) {
 
   if (Array.isArray(scoreObj.candidates) && scoreObj.candidates.length > 0) {
     scoreObj.candidates.forEach(c => {
-      const eligIcon = (c.remoteEligible || "").includes("✅") ? "✅" :
-                       (c.remoteEligible || "").includes("❌") ? "❌" : "⚠️";
+      const eligStr = c.remoteEligible || "Unsure";
+      const eligIcon = eligStr.includes("📍") ? "📍" :
+                       eligStr.includes("🏠💰") ? "🏠💰" :
+                       eligStr.includes("✅") ? "✅" :
+                       eligStr.includes("❌") ? "❌" : "⚠️";
       fields.push({
         name: `👤 ${c.name} — ${c.score}/10`,
-        value: `${eligIcon} **Eligibility:** ${c.remoteEligible || "Unsure"}\n🎯 **Match:** ${c.reason || "N/A"}`,
+        value: `${eligIcon} **Status:** ${eligStr}\n🎯 **Match:** ${c.reason || "N/A"}`,
         inline: false
       });
     });
   }
 
-  // Determine India eligibility tag for the title
+  // Determine India / Delhi-NCR eligibility tag for the title
   const locLower = (job.location || "").toLowerCase();
   const sourceLower = (job.source || "").toLowerCase();
   let locationTag = "🌍";
-  if (/india|bangalore|bengaluru|mumbai|delhi|hyderabad|pune|chennai|kolkata|noida|gurgaon/i.test(locLower)
+  if (/noida|gurgaon|gurugram|delhi/i.test(locLower) || /noida|gurgaon|gurugram|delhi/i.test(job.title.toLowerCase())) {
+    locationTag = "📍 Delhi-NCR";
+  } else if (/india|bangalore|bengaluru|mumbai|hyderabad|pune|chennai|kolkata/i.test(locLower)
     || ["internshala", "unstop", "freshersworld", "naukri", "indeed india"].some(s => sourceLower.includes(s))) {
-    locationTag = "🇮🇳";
+    locationTag = "🇮🇳 India";
   } else if (/worldwide|global|anywhere|remote/i.test(locLower)) {
-    locationTag = "🌐";
+    locationTag = "🌐 Remote";
   }
 
   // Meta fields
   fields.push(
-    { name: `${locationTag} Location`, value: job.location || "Remote", inline: true },
+    { name: "📍 Location", value: job.location || "Remote", inline: true },
     { name: "🏷️ Source", value: job.source || "Web", inline: true },
     { name: "📅 Posted", value: job.date ? new Date(job.date).toLocaleDateString() : "Recent", inline: true }
   );
 
   const embed = {
-    title: `${emoji} ${locationTag} ${job.title} @ ${job.company}`,
+    title: `${emoji} [${locationTag}] ${job.title} @ ${job.company}`,
     url: job.link,
     description: `🎯 **Favored For:** ${scoreObj.bestMatch}\n💡 ${scoreObj.favoredReason}`,
     color: color,
     fields: fields,
-    footer: { text: `Job Bot v2 | India-Fresher-First | ID: ${job.id}` },
+    footer: { text: `Job Bot v2 | India & Delhi-NCR Priority | ID: ${job.id}` },
     timestamp: new Date().toISOString()
   };
 
@@ -86,7 +91,7 @@ export async function pushToDiscord(job, scoreObj) {
       return false;
     }
 
-    console.log(`[Discord] ✅ Pushed: ${locationTag} ${job.title} @ ${job.company} [${scoreObj.bestMatch} | Score: ${maxScore}/10]`);
+    console.log(`[Discord] ✅ Pushed: ${locationTag} | ${job.title} @ ${job.company} [${scoreObj.bestMatch} | Score: ${maxScore}/10]`);
 
     // Respect Discord rate limits
     await sleep(600);
@@ -96,3 +101,4 @@ export async function pushToDiscord(job, scoreObj) {
     return false;
   }
 }
+
