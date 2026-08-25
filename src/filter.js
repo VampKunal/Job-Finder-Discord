@@ -1,21 +1,21 @@
 /**
- * India-Fresher-First Filter v2
+ * India-Fresher-First Filter v3
  * 
- * DESIGN PHILOSOPHY: "India-Positive" approach.
- * Instead of trying to blacklist every possible foreign restriction (whack-a-mole),
- * we REQUIRE jobs to prove India eligibility. A job must either:
- *   (a) Explicitly mention India/Bangalore/Delhi/Mumbai/Hyderabad/etc.
- *   (b) Come from an India-specific source (Internshala, Unstop, Freshersworld, Naukri)
- *   (c) Explicitly say "Worldwide" / "Anywhere" / "Global" remote
- *   (d) Have NO location restriction at all AND be from a remote-first board
+ * Target Candidate Fields:
+ * 1. Full-Stack / Frontend / Backend / Software Engineering (Web, React, Next.js, Node.js, Python, C++)
+ * 2. AI / ML / Generative AI / RAG / Computer Vision / NLP Engineering
  * 
- * Everything else is rejected — no more ambiguous US/EU remote jobs leaking through.
+ * STRICTLY EXCLUDES:
+ * - DevOps / SRE / SysAdmin / Cloud Operations
+ * - Data Analytics / Business Intelligence / Data Entry / BI Analysts
+ * - Telecalling / BPO / KPO / IT Support / Helpdesk
+ * - Fake / Scam / Unpaid / Experience-Letter-Only positions
  */
 
 // ─── INDIA-SPECIFIC SOURCES (auto-pass location check) ───────────────────────
 const INDIA_SOURCES = [
   "internshala", "unstop", "freshersworld", "naukri", "indeed rss (india",
-  "linkedin public" // LinkedIn queries are already India-targeted
+  "linkedin public"
 ];
 
 // ─── INDIAN CITIES & MARKERS ─────────────────────────────────────────────────
@@ -70,33 +70,46 @@ const FOREIGN_ONSITE_CITIES = [
   "tel aviv", "são paulo", "buenos aires", "mexico city"
 ];
 
-// ─── MANDATORY TECH KEYWORDS (title must contain at least one) ───────────────
+// ─── TARGET TECH TITLE KEYWORDS (Must match Full-Stack, Software, or AI/ML) ─
 const TECH_TITLE_KEYWORDS = [
   "software", "developer", "engineer", "frontend", "front-end", "backend", "back-end",
   "fullstack", "full-stack", "full stack", "web", "ai", "ml", "machine learning",
-  "data science", "data scientist", "data engineer", "deep learning",
-  "computer vision", "nlp", "natural language", "python", "react", "node",
+  "deep learning", "computer vision", "nlp", "natural language", "python", "react", "node",
   "java", "c++", "cpp", "golang", "go developer", "rust", "typescript",
-  "cloud", "devops", "sre", "site reliability", "platform engineer",
   "intern", "internship", "fresher", "trainee", "apprentice",
   "associate", "junior", "entry level", "entry-level", "graduate",
   "sde", "swe", "sse", "mts",
   "mobile", "android", "ios", "flutter", "react native",
-  "blockchain", "smart contract", "solidity",
-  "cybersecurity", "security engineer", "infosec",
-  "qa", "quality assurance", "test engineer", "sdet",
-  "database", "dba", "etl", "data pipeline"
+  "artificial intelligence", "genai", "generative ai", "llm", "rag"
 ];
 
-// ─── NON-TECH EXCLUSIONS ─────────────────────────────────────────────────────
-const NON_TECH_EXCLUSIONS = [
+// ─── UNWANTED FIELD EXCLUSIONS (DevOps, Data Analytics, Support, BPO, QA) ────
+const UNWANTED_FIELD_EXCLUSIONS = [
+  // DevOps & Infrastructure (Not targeted by candidates)
+  "devops", "sre", "site reliability", "system admin", "sysadmin", "infrastructure engineer",
+  "cloud operations", "cloud architect", "network engineer", "linux administrator", "system administrator",
+  "build engineer", "release engineer",
+
+  // Data Analytics & Business Intelligence (Not targeted by candidates)
+  "data analyst", "business intelligence", "bi analyst", "bi developer", "data analytics",
+  "power bi", "tableau developer", "reporting analyst", "business analyst", "data operations",
+  "data entry analyst",
+
+  // IT Support, BPO, Telecalling & Helpdesk
+  "it support", "technical support", "helpdesk", "desktop support", "service desk",
+  "it coordinator", "system support", "bpo", "kpo", "telecaller", "tele-caller",
+  "telecalling", "voice process", "non voice process", "back office", "chat support",
+
+  // Manual QA & Testing
+  "manual tester", "qa tester", "test analyst", "quality assurance analyst",
+
+  // Non-Tech / Corporate / Sales
   "accounting", "accountant", "auditor", "hr generalist", "recruiter",
   "human resources", "talent acquisition", "sales representative",
   "business development", "marketing manager", "copywriter", "content writer",
-  "logistics", "legal counsel", "lawyer", "paralegal",
-  "graphic designer", "office manager", "receptionist", "customer service",
-  "financial analyst", "executive assistant", "operations manager",
-  "nurse", "physician", "pharmacist", "teacher", "professor",
+  "logistics", "legal counsel", "lawyer", "paralegal", "graphic designer",
+  "office manager", "receptionist", "customer service", "financial analyst",
+  "operations manager", "nurse", "physician", "pharmacist",
   "steuerfachangestellter", "bilanzbuchhalter", "projektkoordinator",
   "vertriebsmitarbeiter", "mediengestalter", "teamleiter", "pflege"
 ];
@@ -105,7 +118,7 @@ const NON_TECH_EXCLUSIONS = [
 const NON_ENGLISH_MARKERS = [
   "(m/w/d)", "(f/m/d)", "all genders", "teilzeit", "vollzeit",
   "personalberatung", "systemhaus", "gesellschaften", "mitarbeiter",
-  "(h/f)", "cdi", "alternance" // French job markers
+  "(h/f)", "cdi", "alternance"
 ];
 
 // ─── JUNK / NON-JOB SECTION HEADER EXCLUSIONS ──────────────────────────────
@@ -153,12 +166,16 @@ const FAKE_AND_UNPAID_MARKERS = [
   "100% commission", "pay per lead", "pay per sale", "unpaid internship",
   "no salary", "performance based stipend only", "stipend: 0", "stipend: rs 0",
   "stipend - 0", "stipend - rs 0", "stipend : 0", "stipend : rs. 0",
+  "stipend: nil", "stipend: null", "certificate only", "certificate of completion",
+  "experience letter only", "perks only", "lpa: 0",
 
-  // Scam / Data Entry / Typing / Copy-Paste fraud
+  // Scam / Data Entry / Typing / Copy-Paste fraud / Telecalling
   "data entry", "form filling", "copy paste", "sms sending", "typing job",
   "online typing", "captcha typing", "survey taker", "earn money online",
   "work from home without investment", "part time typing", "packet packing",
   "handwriting job", "offline data entry", "part-time data entry",
+  "telecaller", "telecalling", "tele-caller", "telemarketing", "bpo", "kpo",
+  "back office", "voice process", "chat support",
 
   // Multi-Level Marketing (MLM) & Pyramid Schemes
   "network marketing", "herbalife", "amway", "forever living", "pyramid scheme",
@@ -242,7 +259,7 @@ export function isRemotePaidJob(job) {
 }
 
 /**
- * Check if a job title is tech-relevant and fresher/intern level
+ * Check if a job title is tech-relevant (Fullstack/AI/Software) and fresher/intern level
  */
 export function matchesKeywords(job) {
   const titleLower = (job.title || "").toLowerCase();
@@ -263,8 +280,8 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 3. Exclude Non-Tech roles
-  if (NON_TECH_EXCLUSIONS.some(e => titleLower.includes(e))) {
+  // 3. Exclude Unwanted Fields (DevOps, Data Analytics, SysAdmin, Support, QA, Non-Tech)
+  if (UNWANTED_FIELD_EXCLUSIONS.some(e => titleLower.includes(e))) {
     return false;
   }
 
@@ -273,7 +290,7 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 5. Require at least one tech keyword in title
+  // 5. Require at least one target tech keyword in title
   const isTechTitle = TECH_TITLE_KEYWORDS.some(k => titleLower.includes(k));
   if (!isTechTitle) {
     return false;
@@ -384,7 +401,6 @@ export function filterJobs(jobs) {
     return true;
   });
 
-  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Tech/Senior: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
+  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Target-Tech/Senior/DevOps/DataAnalyst: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }
-
