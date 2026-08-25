@@ -21,9 +21,9 @@ if (process.env.GROQ_API_KEY) {
 // Active Groq models in order of priority
 const GROQ_MODELS = [
   "llama-3.3-70b-versatile",
+  "llama3-70b-8192",
   "llama-3.1-8b-instant",
-  "mixtral-8x7b-32768",
-  "deepseek-r1-distill-llama-70b"
+  "gemma2-9b-it"
 ];
 
 // ─── India eligibility signals ─────────────────────────────────────────
@@ -358,12 +358,15 @@ Respond ONLY with valid JSON:
   // Try active Groq models in order
   for (const modelId of GROQ_MODELS) {
     try {
-      const res = await groq.chat.completions.create({
-        model: modelId,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 500,
-        temperature: 0.1,
-      });
+      const res = await groq.chat.completions.create(
+        {
+          model: modelId,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 500,
+          temperature: 0.1,
+        },
+        { signal: AbortSignal.timeout(6000) }
+      );
 
       const raw = res.choices[0]?.message?.content?.trim() || "";
       const noThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();

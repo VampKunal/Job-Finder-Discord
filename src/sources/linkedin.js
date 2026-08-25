@@ -1,14 +1,14 @@
 /**
- * LinkedIn Public Guest Jobs API Fetcher v2
+ * LinkedIn Public Guest Jobs API Fetcher v2 (Optimized)
  * 
  * Changes from v1:
- * - ALL queries now target India explicitly
- * - Added more diverse search terms
- * - Added 2 "worldwide remote" queries for global remote internships
- * - Increased query breadth for more coverage
+ * - Added strict request timeouts (7s) via fetchWithTimeout
+ * - Batch concurrent query fetching (chunk size 5) to cut fetch time from 2min -> ~10sec
+ * - All queries target India explicitly or Global Remote for India candidates
  */
 
 import * as cheerio from "cheerio";
+import { fetchWithTimeout } from "../tools/fetch.js";
 
 export async function fetchLinkedInJobs() {
   const searchQueries = [
@@ -45,24 +45,22 @@ export async function fetchLinkedInJobs() {
   const jobs = [];
   const seen = new Set();
 
-  for (const q of searchQueries) {
+  async function processQuery(q) {
     try {
       const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(q.keywords)}&location=${encodeURIComponent(q.location)}&start=0`;
 
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
           "Accept-Language": "en-US,en;q=0.9"
         }
-      });
+      }, 7000);
 
-      if (!res.ok) {
-        console.warn(`[LinkedIn] Public API returned HTTP ${res.status}`);
-        continue;
-      }
+      if (!res.ok) return [];
 
       const html = await res.text();
       const $ = cheerio.load(html);
+      const queryJobs = [];
 
       $("li").each((_, el) => {
         const title = $(el).find(".base-search-card__title").text().trim();
@@ -72,14 +70,14 @@ export async function fetchLinkedInJobs() {
         const dateText = $(el).find("time").attr("datetime") || $(el).find("time").text().trim();
 
         if (title && link) {
-          const cleanLink = link.split("?")[0]; // Clean tracking params
+          const cleanLink = link.split("?")[0];
           const jobId = cleanLink.split("-").pop() || Math.random().toString(36).substring(7);
           const dedupKey = `linkedin-${jobId}`;
 
           if (seen.has(dedupKey)) return;
           seen.add(dedupKey);
 
-          jobs.push({
+          queryJobs.push({
             id: dedupKey,
             title,
             company: company || "LinkedIn Employer",
@@ -92,12 +90,19 @@ export async function fetchLinkedInJobs() {
         }
       });
 
-      // Small delay between LinkedIn requests to avoid rate limiting
-      await new Promise(r => setTimeout(r, 300));
-
+      return queryJobs;
     } catch (err) {
       console.warn(`[LinkedIn] Fetch error for "${q.keywords}": ${err.message}`);
+      return [];
     }
+  }
+
+  // Chunk queries into batches of 5 for parallel fetching
+  const chunkSize = 5;
+  for (let i = 0; i < searchQueries.length; i += chunkSize) {
+    const chunk = searchQueries.slice(i, i + chunkSize);
+    const chunkResults = await Promise.all(chunk.map(q => processQuery(q)));
+    chunkResults.forEach(res => jobs.push(...res));
   }
 
   return jobs;

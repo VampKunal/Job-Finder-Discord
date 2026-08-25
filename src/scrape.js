@@ -1,14 +1,6 @@
 /**
- * Main Orchestrator Script for Job Discovery Bot v2
+ * Main Orchestrator Script for Job Discovery Bot v2 (Optimized)
  * 20 Sources: India-First + Global Remote + ATS + Social/Community
- * 
- * Priority Order:
- *   Tier 1 (India-Explicit): LinkedIn India, Indeed India, Internshala, Unstop,
- *           Naukri, India Aggregators (Foundit, Shine, TimesJobs), Freshersworld
- *   Tier 2 (Global Remote): Remotive, RemoteOK, Himalayas, WWR, Arbeitnow,
- *           Jobicy, JustRemote
- *   Tier 3 (ATS Direct): Greenhouse/Lever for 80+ companies (Indian unicorns + global)
- *   Tier 4 (Community): GitHub Internships, HN Hiring, Reddit, Dev.to
  */
 
 import "dotenv/config";
@@ -126,14 +118,33 @@ async function main() {
     return;
   }
 
-  // ── 4. LLM Scoring & Discord Push ──────────────────────────────────
+  // Cap jobs to score per cycle to prevent rate-limiting or cycle bloat (max 40)
+  const MAX_JOBS_PER_RUN = 40;
+  const jobsToScore = newJobs.slice(0, MAX_JOBS_PER_RUN);
+  if (newJobs.length > MAX_JOBS_PER_RUN) {
+    console.log(`[Scoring] Processing top ${MAX_JOBS_PER_RUN} jobs out of ${newJobs.length} new jobs.`);
+  }
+
+  // ── 4. Parallel LLM Scoring & Discord Push (Concurrency 5) ──────────
   let pushedCount = 0;
   let skippedCount = 0;
-  for (const job of newJobs) {
-    const scoreObj = await scoreJobForCandidates(job);
-    const pushed = await pushToDiscord(job, scoreObj);
-    if (pushed) pushedCount++;
-    else skippedCount++;
+  const batchSize = 5;
+
+  for (let i = 0; i < jobsToScore.length; i += batchSize) {
+    const chunk = jobsToScore.slice(i, i + batchSize);
+    await Promise.all(
+      chunk.map(async (job) => {
+        try {
+          const scoreObj = await scoreJobForCandidates(job);
+          const pushed = await pushToDiscord(job, scoreObj);
+          if (pushed) pushedCount++;
+          else skippedCount++;
+        } catch (err) {
+          console.error(`[Scoring Error] Failed for job ${job.title}: ${err.message}`);
+          skippedCount++;
+        }
+      })
+    );
   }
 
   console.log(`\n====================================================`);

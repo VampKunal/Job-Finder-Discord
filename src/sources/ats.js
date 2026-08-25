@@ -1,10 +1,11 @@
 /**
- * Greenhouse and Lever ATS public JSON endpoint fetchers
+ * Greenhouse and Lever ATS public JSON endpoint fetchers (Optimized)
  * Fetches listings for target companies defined in companies.json
  */
 
 import fs from "fs";
 import path from "path";
+import { fetchWithTimeout } from "../tools/fetch.js";
 
 function loadCompanies() {
   try {
@@ -22,7 +23,7 @@ function loadCompanies() {
 async function fetchGreenhouseCompany(company) {
   const url = `https://boards-api.greenhouse.io/v1/boards/${company.greenhouse}/jobs?content=true`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 6000);
     if (!res.ok) return [];
     const data = await res.json();
     const jobs = data.jobs || [];
@@ -38,7 +39,6 @@ async function fetchGreenhouseCompany(company) {
       source: `Greenhouse (${company.name})`
     }));
   } catch (err) {
-    console.warn(`[Greenhouse] Failed fetching for ${company.name}: ${err.message}`);
     return [];
   }
 }
@@ -46,7 +46,7 @@ async function fetchGreenhouseCompany(company) {
 async function fetchLeverCompany(company) {
   const url = `https://api.lever.co/v0/postings/${company.lever}?mode=json`;
   try {
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {}, 6000);
     if (!res.ok) return [];
     const jobs = await res.json();
     if (!Array.isArray(jobs)) return [];
@@ -62,7 +62,6 @@ async function fetchLeverCompany(company) {
       source: `Lever (${company.name})`
     }));
   } catch (err) {
-    console.warn(`[Lever] Failed fetching for ${company.name}: ${err.message}`);
     return [];
   }
 }

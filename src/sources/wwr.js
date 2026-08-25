@@ -1,11 +1,10 @@
 /**
- * WeWorkRemotely RSS feed fetcher
- * RSS URL: https://weworkremotely.com/remote-jobs.rss
+ * WeWorkRemotely RSS feed fetcher (Optimized)
  */
 
 import Parser from "rss-parser";
 
-const parser = new Parser();
+const parser = new Parser({ timeout: 7000 });
 
 export async function fetchWWRJobs() {
   try {
@@ -13,7 +12,6 @@ export async function fetchWWRJobs() {
     const items = feed.items || [];
 
     return items.map(item => {
-      // Title format is usually "Company: Title" or "Title"
       let company = "WeWorkRemotely";
       let title = item.title || "Software Role";
 

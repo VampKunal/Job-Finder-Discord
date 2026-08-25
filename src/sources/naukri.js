@@ -1,13 +1,13 @@
 /**
- * Naukri.com RSS Fetcher — India's #1 Job Portal
- * Uses Naukri's public RSS feeds for targeted fresher/intern job searches
- * These feeds are freely available with no auth required
+ * Naukri.com RSS Fetcher (Optimized)
+ * Uses Naukri's public RSS feeds with strict 7s timeout & parallel fetching
  */
 
 import Parser from "rss-parser";
 import crypto from "crypto";
 
 const parser = new Parser({
+  timeout: 7000,
   customFields: { item: ["company"] }
 });
 
@@ -24,40 +24,49 @@ const NAUKRI_FEEDS = [
   { url: "https://www.naukri.com/rss?ql=java+developer+fresher&l=india&experience=0&qf=", label: "Java Fresher" }
 ];
 
-export async function fetchNaukriJobs() {
+async function fetchFeed(feed, seen) {
   const jobs = [];
+  try {
+    const result = await parser.parseURL(feed.url);
+    const items = result.items || [];
+
+    for (const item of items) {
+      const title = (item.title || "").trim();
+      const link = (item.link || "").trim();
+      if (!title || !link) continue;
+
+      const stableKey = `naukri_${title}_${link}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (seen.has(stableKey)) continue;
+      seen.add(stableKey);
+
+      const hash = crypto.createHash("md5").update(stableKey).digest("hex").substring(0, 12);
+      const description = (item.contentSnippet || item.content || "").replace(/<[^>]*>?/gm, "");
+
+      jobs.push({
+        id: `naukri-${hash}`,
+        title,
+        company: item.company || item.creator || "Naukri Employer",
+        link,
+        location: "India",
+        description: description.length > 50 ? description : `${title}. Found via Naukri RSS (${feed.label}).`,
+        date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+        source: `Naukri (${feed.label})`
+      });
+    }
+  } catch (e) {
+    // Silently handle timeouts or errors
+  }
+  return jobs;
+}
+
+export async function fetchNaukriJobs() {
   const seen = new Set();
+  const results = await Promise.allSettled(NAUKRI_FEEDS.map(f => fetchFeed(f, seen)));
+  const jobs = [];
 
-  for (const feed of NAUKRI_FEEDS) {
-    try {
-      const result = await parser.parseURL(feed.url);
-      const items = result.items || [];
-
-      for (const item of items) {
-        const title = (item.title || "").trim();
-        const link = (item.link || "").trim();
-        if (!title || !link) continue;
-
-        const stableKey = `naukri_${title}_${link}`.toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (seen.has(stableKey)) continue;
-        seen.add(stableKey);
-
-        const hash = crypto.createHash("md5").update(stableKey).digest("hex").substring(0, 12);
-        const description = (item.contentSnippet || item.content || "").replace(/<[^>]*>?/gm, "");
-
-        jobs.push({
-          id: `naukri-${hash}`,
-          title,
-          company: item.company || item.creator || "Naukri Employer",
-          link,
-          location: "India",
-          description: description.length > 50 ? description : `${title}. Found via Naukri RSS (${feed.label}).`,
-          date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-          source: `Naukri (${feed.label})`
-        });
-      }
-    } catch (e) {
-      // Naukri may throttle — skip silently
+  for (const res of results) {
+    if (res.status === "fulfilled" && Array.isArray(res.value)) {
+      jobs.push(...res.value);
     }
   }
 

@@ -1,18 +1,15 @@
 /**
- * Google Jobs / SerpAPI-Free RSS Fetcher for India Fresher Jobs
- * Uses Google's job search RSS/Atom-like endpoints
- * Also scrapes Google Careers (google.com/about/careers) for India intern roles
+ * Google Jobs / SerpAPI-Free RSS Fetcher for India Fresher Jobs (Optimized)
  */
 
 import crypto from "crypto";
+import { fetchWithTimeout } from "../tools/fetch.js";
 
 const GOOGLE_CAREER_PAGES = [
-  // Google's own careers API for India
   "https://r.jina.ai/https://www.google.com/about/careers/applications/jobs/results?location=India&target_level=INTERN_AND_APPRENTICE&category=SOFTWARE_ENGINEERING",
   "https://r.jina.ai/https://www.google.com/about/careers/applications/jobs/results?location=India&target_level=EARLY&category=SOFTWARE_ENGINEERING"
 ];
 
-// Additional India-focused job aggregator pages via Jina
 const INDIA_JOB_PAGES = [
   { url: "https://r.jina.ai/https://www.foundit.in/srp/results?searchType=personalised&query=software+intern&locations=india&experienceRanges=0~1", source: "Foundit (Monster India)", location: "India" },
   { url: "https://r.jina.ai/https://www.shine.com/job-search/software-engineer-fresher-jobs", source: "Shine", location: "India" },
@@ -24,12 +21,12 @@ async function scrapeJinaPage(url, source, location) {
   const seen = new Set();
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobBot/1.0",
         "X-Return-Format": "text"
       }
-    });
+    }, 8000);
 
     if (!res.ok) return [];
 
@@ -83,15 +80,13 @@ async function scrapeJinaPage(url, source, location) {
 }
 
 export async function fetchIndiaAggregatorJobs() {
-  const allJobs = [];
-
-  // Fetch all India aggregator pages concurrently
   const tasks = [
     ...GOOGLE_CAREER_PAGES.map(url => scrapeJinaPage(url, "Google Careers India", "India")),
     ...INDIA_JOB_PAGES.map(p => scrapeJinaPage(p.url, p.source, p.location))
   ];
 
   const results = await Promise.allSettled(tasks);
+  const allJobs = [];
 
   for (const result of results) {
     if (result.status === "fulfilled" && Array.isArray(result.value)) {
