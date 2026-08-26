@@ -128,7 +128,7 @@ async function main() {
   // ── 4. Parallel LLM Scoring & Discord Push (Concurrency 5) ──────────
   let pushedCount = 0;
   let skippedCount = 0;
-  const batchSize = 5;
+  const batchSize = 2;
 
   for (let i = 0; i < jobsToScore.length; i += batchSize) {
     const chunk = jobsToScore.slice(i, i + batchSize);

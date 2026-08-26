@@ -435,6 +435,9 @@ Respond ONLY with valid JSON:
       };
     } catch (err) {
       console.warn(`[Score] Groq model ${modelId} attempt failed for "${job.title}": ${err.message}`);
+      if (err.status === 429 || (err.message && err.message.includes("429"))) {
+        await new Promise(r => setTimeout(r, 1200));
+      }
     }
   }
 
