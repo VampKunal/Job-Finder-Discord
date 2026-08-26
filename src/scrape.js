@@ -68,6 +68,7 @@ async function main() {
 
   console.log(`\n[Pipeline] Total raw jobs collected: ${rawJobs.length}`);
   await runPipeline(rawJobs, "Single Run");
+  process.exit(0);
 }
 
 main().catch((err) => {

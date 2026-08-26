@@ -22,9 +22,10 @@ if (process.env.GROQ_API_KEY) {
 
 // Active Groq models in order of priority
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama-3.1-8b-instant",
-  "gemma2-9b-it"
+  "groq/compound-mini",
+  "qwen/qwen3.6-27b",
+  "groq/compound",
+  "openai/gpt-oss-20b"
 ];
 
 // ─── India eligibility signals ─────────────────────────────────────────
@@ -364,7 +365,7 @@ Job Details:
 - Location: ${job.location}
 - Source: ${job.source}
 - Priority Markers: ${isDelhiNCR ? "📍 Delhi-NCR (Noida/Gurgaon/Delhi)" : ""} ${isRemotePaid ? "🏠💰 Remote Paid" : ""}
-- Full Scraped Job Content: ${fullContent.slice(0, 2500)}
+- Full Scraped Job Content: ${fullContent.slice(0, 1200)}
 
 Respond ONLY with valid JSON:
 {
