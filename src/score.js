@@ -22,11 +22,9 @@ if (process.env.GROQ_API_KEY) {
 
 // Active Groq models in order of priority
 const GROQ_MODELS = [
-  "groq/compound",
-  "groq/compound-mini",
-  "qwen/qwen3.6-27b",
-  "openai/gpt-oss-20b",
-  "openai/gpt-oss-120b"
+  "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
+  "gemma2-9b-it"
 ];
 
 // ─── India eligibility signals ─────────────────────────────────────────
