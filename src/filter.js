@@ -142,19 +142,42 @@ const SENIORITY_EXCLUSIONS = [
   "sde 2", "sde-2", "sde2", "sde 3", "sde-3", "sde3", "sde ii", "sde-ii", "sde iii", "sde-iii",
   "software engineer 2", "software engineer ii", "software engineer 3", "software engineer iii",
   "swe 2", "swe-2", "swe2", "swe 3", "swe-3", "swe3",
-  "5+ years", "7+ years", "10+ years", "3-5 years", "5-7 years", "2+ years", "3+ years"
+  "5+ years", "7+ years", "10+ years", "3-5 years", "5-7 years"
 ];
 
-// ─── EXPERIENCE REGEX (2+ years = too senior) ───────────────────────────────
-const EXP_REQUIREMENT_REGEX = /(?:[2-9]|\d{2})\+?\s*(?:-\s*[2-9]\d?)?\s*(?:years?|yrs?|yoe)\b|(?:minimum|at least|requires?|with)\s*(?:[2-9]|\d{2})\+?\s*(?:years?|yrs?|yoe)\b|\b[2-9]\s*\+\s*(?:years?|yrs?|yoe)\b/i;
+/**
+ * EXPERIENCE CHECK:
+ * Explicitly ALLOWS 0 exp / 0-1 / 0-2 / 0-3 yrs / freshers / interns / entry-level / graduates.
+ * REJECTS positions that strictly require 2+ or 3+ years of experience (without 0-1/0-2 lower bound).
+ */
+export function requiresSeniorExperience(text) {
+  if (!text) return false;
+  const textLower = text.toLowerCase();
+
+  // 1. Explicitly ALLOW 0 exp, 0-1 yr, 0-2 yrs, 0-3 yrs, 1-2 yrs, freshers, interns, entry-level, graduates, trainees
+  if (
+    /\b0\s*(?:-|to|\+)\s*[1-3]\s*(?:years?|yrs?|yoe)\b/i.test(textLower) ||
+    /\b1\s*(?:-|to)\s*2\s*(?:years?|yrs?|yoe)\b/i.test(textLower) ||
+    /\b(?:0|zero|no)\s*(?:years?|yrs?|yoe|exp|experience)\b/i.test(textLower) ||
+    /\b(fresher|freshers|intern|internship|trainee|apprentice|entry-level|entry level|new grad|campus hire|graduate)\b/i.test(textLower)
+  ) {
+    return false; // Valid for 0 exp / fresher
+  }
+
+  // 2. REJECT if text explicitly requires 2+ years, 3+ years, 2-5 years, 3-5 years, or min 2+ years without 0 bound
+  const seniorExpRegex = /\b(?:[2-9]|\d{2})\s*\+\s*(?:years?|yrs?|yoe)\b|\b(?:[2-9]|\d{2})\s*(?:-|to)\s*(?:[3-9]|\d{2})\s*(?:years?|yrs?|yoe)\b|\b(?:minimum|at least|requires?|with)\s+(?:[2-9]|\d{2})\+?\s*(?:years?|yrs?|yoe)\b|\b(?:[2-9]|\d{2})\s*(?:years?|yrs?|yoe)\s+(?:of\s+)?experience\b/i;
+
+  return seniorExpRegex.test(textLower);
+}
 
 // ─── FRESHER / INTERN BOOST SIGNALS ─────────────────────────────────────────
 const FRESHER_BOOST_KEYWORDS = [
-  "0-1 year", "0 - 1 year", "0-2 year", "no experience required",
-  "freshers welcome", "fresher", "recent graduate", "new grad",
-  "campus hire", "campus recruitment", "internship", "intern",
-  "trainee", "apprentice", "graduate trainee", "entry level",
-  "entry-level", "junior", "associate"
+  "0-1 year", "0 - 1 year", "0-2 year", "0 - 2 year", "0-3 year", "0 - 3 year",
+  "0-1 yrs", "0 - 1 yrs", "0-2 yrs", "0 - 2 yrs", "0-3 yrs", "0 - 3 yrs",
+  "0 to 1 year", "0 to 2 years", "0 to 3 years", "0+ years", "0 yrs", "0 yr",
+  "no experience required", "no experience", "freshers welcome", "fresher", "freshers",
+  "recent graduate", "new grad", "campus hire", "campus recruitment", "internship", "intern",
+  "trainee", "apprentice", "graduate trainee", "entry level", "entry-level", "junior", "associate"
 ];
 
 // ─── FAKE / SCAM / UNPAID EXCLUSION MARKERS ────────────────────────────────
@@ -219,12 +242,7 @@ export function isFakeJob(job) {
     return true;
   }
 
-  // 3. Extremely short or boilerplate spam descriptions
-  if (descLower.length < 80) {
-    return true;
-  }
-
-  // 4. Repeated junk phrases or missing real title
+  // 3. Repeated junk phrases or missing real title
   if (/lorem ipsum|sample text|test title/i.test(textLower)) {
     return true;
   }
@@ -276,7 +294,7 @@ export function matchesKeywords(job) {
   }
 
   // 2. Exclude postings requiring 2+ years of experience
-  if (EXP_REQUIREMENT_REGEX.test(textLower)) {
+  if (requiresSeniorExperience(textLower)) {
     return false;
   }
 
@@ -354,8 +372,11 @@ export function isLocationEligible(job) {
  * Ghost listing detection (stale/vague posts)
  */
 export function isGhostListing(job) {
-  if (!job.description || job.description.trim().length < 100) {
-    return true; // Too vague
+  if (!job.title || job.title.trim().length < 3) {
+    return true;
+  }
+  if (!job.description || job.description.trim().length < 15) {
+    return true; // Require basic description
   }
 
   if (job.date) {
@@ -404,3 +425,4 @@ export function filterJobs(jobs) {
   console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Target-Tech/Senior/DevOps/DataAnalyst: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }
+

@@ -12,7 +12,8 @@
 import Groq from "groq-sdk";
 import fs from "fs";
 import path from "path";
-import { isDelhiNCRLocation, isRemotePaidJob, isFakeJob } from "./filter.js";
+import { isDelhiNCRLocation, isRemotePaidJob, isFakeJob, requiresSeniorExperience } from "./filter.js";
+import { scrapeJobPageText } from "./page_scraper.js";
 
 let groq = null;
 if (process.env.GROQ_API_KEY) {
@@ -21,10 +22,11 @@ if (process.env.GROQ_API_KEY) {
 
 // Active Groq models in order of priority
 const GROQ_MODELS = [
-  "llama-3.3-70b-versatile",
-  "llama3-70b-8192",
-  "llama-3.1-8b-instant",
-  "gemma2-9b-it"
+  "groq/compound",
+  "groq/compound-mini",
+  "qwen/qwen3.6-27b",
+  "openai/gpt-oss-20b",
+  "openai/gpt-oss-120b"
 ];
 
 // ─── India eligibility signals ─────────────────────────────────────────
@@ -168,8 +170,8 @@ export function evaluateHeuristicScoring(job, profiles) {
   const isDelhiNCR = isDelhiNCRLocation(job);
   const isRemotePaid = isRemotePaidJob(job);
 
-  // Experience requirement check: If job requires 2+ years of exp, hard cap score at 2
-  const hasExpReq = /(?:[2-9]|\d{2})\+?\s*(?:years|yrs|yoe)|(?:minimum|at least)\s*[2-9]\s*years/i.test(text);
+  // Experience requirement check: If job strictly requires 2+ years of exp (without 0 exp / 0-2 yrs bound), hard cap score at 2
+  const hasExpReq = requiresSeniorExperience(text);
 
   let locationCeiling = 10;
   let remoteLabel = "Unsure";
@@ -324,27 +326,39 @@ export async function scoreJobForCandidates(job) {
     return evaluateHeuristicScoring(job, [{ name: "Kunal Rai", role: "Software Engineer", skills: ["javascript", "python"] }]);
   }
 
+  // 1. Scrape full job page content for deep semantic analysis
+  let fullContent = job.description || "";
+  const pageUrl = job.link || job.url;
+  if (pageUrl) {
+    const scrapedText = await scrapeJobPageText(pageUrl);
+    if (scrapedText && scrapedText.length > fullContent.length) {
+      fullContent = scrapedText;
+    }
+  }
+
   if (!groq) {
-    return evaluateHeuristicScoring(job, profiles);
+    // Update job description in memory with full scraped content for heuristic evaluation
+    const enrichedJob = { ...job, description: fullContent };
+    return evaluateHeuristicScoring(enrichedJob, profiles);
   }
 
   const isDelhiNCR = isDelhiNCRLocation(job);
   const isRemotePaid = isRemotePaidJob(job);
 
   const prompt = `
-You are an expert technical recruiter evaluating a job posting for candidates located in DELHI NCR, INDIA.
+You are an expert technical recruiter evaluating a job posting for 0-EXPERIENCE / FRESHER candidates located in DELHI NCR, INDIA.
 Candidates:
 ${profiles.map((p, idx) => `[Candidate ${idx + 1}] Name: "${p.name}", Role: "${p.role}", Skills: ${p.skills.join(", ")}, Projects: ${Array.isArray(p.projects) ? p.projects.join(" | ") : ""}`).join("\n")}
 
-STRICT TARGET FIELDS & SCORING RULES:
+STRICT TARGET FIELDS & 0-EXPERIENCE EVALUATION RULES:
 1. Candidate names MUST strictly match exact profile names ("${profiles.map(p => p.name).join('", "')}").
-2. TARGET FIELDS ONLY: Full-Stack / Web / Software Engineering (React, Next.js, Node.js, Express, Python, C++) OR AI/ML/GenAI Engineering (LLMs, RAG, Computer Vision, PyTorch, TensorFlow).
-3. EXCLUDE & SCORE 1-2 MAX: DevOps, Site Reliability (SRE), SysAdmin, Data Analyst / Data Analytics, Business Intelligence, Telecalling, BPO, QA/Testing, or non-engineering roles.
-4. SKILL & PROJECT MATCHING: Evaluate if job requirements match candidate skills or project tech stacks (e.g. Next.js, LangChain, RAG, WebSockets, Redis, FastAPI, Gemini, Computer Vision).
-5. BOTH candidates live in Delhi-NCR. Give a STRONG SCORE BOOST (+2) for jobs in NOIDA, GURGAON / GURUGRAM, DELHI, NEW DELHI, or DELHI-NCR! (Delhi NCR Job = ${isDelhiNCR ? "YES" : "NO"})
-6. Give a STRONG SCORE BOOST (+1.5) for REMOTE PAID jobs! (Remote Paid Job = ${isRemotePaid ? "YES" : "NO"})
-7. REJECT / SCORE 0-2 MAX if the job is UNPAID, Zero Stipend, Scam, Pay-to-work, Data Entry, Experience-Letter-Only, or fake.
-8. If the job requires 2+ years of experience → score ALL candidates 1-3 max.
+2. 0-EXPERIENCE / FRESHER FOCUS: High priority for jobs accepting freshers (0 exp, 0-1 yrs, 0-2 yrs, 0-3 yrs, interns, trainees, graduates, entry-level).
+3. SENIORITY REJECTION: REJECT & SCORE 1-2 MAX if the job strictly requires 2+ or 3+ years of experience without entry options for freshers.
+4. TARGET FIELDS ONLY: Full-Stack / Web / Software Engineering (React, Next.js, Node.js, Express, Python, C++) OR AI/ML/GenAI Engineering (LLMs, RAG, Computer Vision, PyTorch, TensorFlow).
+5. EXCLUDE & SCORE 1-2 MAX: DevOps, Site Reliability (SRE), SysAdmin, Data Analyst / Data Analytics, Business Intelligence, Telecalling, BPO, QA/Testing, or non-engineering roles.
+6. LOCATION BOOST: BOTH candidates live in Delhi-NCR. Give a STRONG SCORE BOOST (+2) for jobs in NOIDA, GURGAON / GURUGRAM, DELHI, NEW DELHI, or DELHI-NCR! (Delhi NCR Job = ${isDelhiNCR ? "YES" : "NO"})
+7. REMOTE BOOST: Give a STRONG SCORE BOOST (+1.5) for REMOTE PAID jobs! (Remote Paid Job = ${isRemotePaid ? "YES" : "NO"})
+8. FRAUD REJECT: REJECT / SCORE 0-2 MAX if the job is UNPAID, Zero Stipend, Scam, Pay-to-work, Data Entry, Experience-Letter-Only, or fake.
 
 Job Details:
 - Title: ${job.title}
@@ -352,18 +366,18 @@ Job Details:
 - Location: ${job.location}
 - Source: ${job.source}
 - Priority Markers: ${isDelhiNCR ? "📍 Delhi-NCR (Noida/Gurgaon/Delhi)" : ""} ${isRemotePaid ? "🏠💰 Remote Paid" : ""}
-- Description Excerpt: ${job.description.slice(0, 800)}
+- Full Scraped Job Content: ${fullContent.slice(0, 2500)}
 
 Respond ONLY with valid JSON:
 {
   "bestMatch": "Exact candidate name (e.g. 'Kunal Rai' or 'Akshat Jain') or 'Both' or 'Neither'",
-  "favoredReason": "One short sentence.",
+  "favoredReason": "One short sentence explaining why this job fits 0-exp / fresher candidates.",
   "candidates": [
     {
       "name": "Exact candidate name from prompt",
       "score": 8,
       "remoteEligible": "Yes (Delhi NCR)" OR "Yes (Remote Paid)" OR "Yes (India)" OR "No",
-      "reason": "One concise sentence specifying candidate skill/project match and rating breakdown."
+      "reason": "One concise sentence specifying candidate skill/project match and fresher eligibility."
     }
   ]
 }
