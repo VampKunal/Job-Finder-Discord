@@ -4,13 +4,7 @@
  */
 
 import "dotenv/config";
-import { fetchRemoteOKJobs } from "./sources/remoteok.js";
-import { fetchHimalayasJobs } from "./sources/himalayas.js";
-import { fetchArbeitnowJobs } from "./sources/arbeitnow.js";
-import { fetchWWRJobs } from "./sources/wwr.js";
 import { fetchATSJobs } from "./sources/ats.js";
-import { fetchRemotiveJobs } from "./sources/remotive.js";
-import { fetchJobicyJobs } from "./sources/jobicy.js";
 import { fetchGitHubInternships } from "./sources/github_internships.js";
 import { fetchLinkedInJobs } from "./sources/linkedin.js";
 import { fetchWellfoundJobs } from "./sources/wellfound.js";
@@ -20,7 +14,7 @@ import { fetchIndeedRSSJobs } from "./sources/indeed_rss.js";
 import { fetchInternshalaJobs } from "./sources/internshala.js";
 import { fetchUnstopJobs } from "./sources/unstop.js";
 import { fetchDevToJobs } from "./sources/devto_jobs.js";
-import { fetchJustRemoteJobs } from "./sources/justremote.js";
+import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
 import { fetchIndiaAggregatorJobs } from "./sources/india_aggregators.js";
 import { runPipeline } from "./pipeline.js";
@@ -37,20 +31,14 @@ async function main() {
     { name: "Internshala", fn: fetchInternshalaJobs },
     { name: "Unstop", fn: fetchUnstopJobs },
     { name: "Naukri RSS", fn: fetchNaukriJobs },
-    { name: "India Aggregators", fn: fetchIndiaAggregatorJobs },
-    { name: "Wellfound", fn: fetchWellfoundJobs },
-    { name: "Remotive", fn: fetchRemotiveJobs },
-    { name: "RemoteOK", fn: fetchRemoteOKJobs },
-    { name: "Himalayas", fn: fetchHimalayasJobs },
-    { name: "Arbeitnow", fn: fetchArbeitnowJobs },
-    { name: "WeWorkRemotely", fn: fetchWWRJobs },
-    { name: "Jobicy", fn: fetchJobicyJobs },
-    { name: "JustRemote + Freshersworld", fn: fetchJustRemoteJobs },
-    { name: "ATS (Greenhouse/Lever)", fn: fetchATSJobs },
+    { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
+    { name: "Wellfound India", fn: fetchWellfoundJobs },
+    { name: "Freshersworld India", fn: fetchFreshersworldJobs },
+    { name: "ATS Direct (Greenhouse/Lever)", fn: fetchATSJobs },
     { name: "GitHub Open Internships", fn: fetchGitHubInternships },
-    { name: "HN Who's Hiring", fn: fetchHNHiringJobs },
-    { name: "Reddit Jobs", fn: fetchRedditJobs },
-    { name: "Dev.to", fn: fetchDevToJobs },
+    { name: "HN Who's Hiring (India/Remote)", fn: fetchHNHiringJobs },
+    { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
+    { name: "Dev.to Jobs", fn: fetchDevToJobs },
   ];
 
   const fetchResults = await Promise.allSettled(allFetchers.map(f => f.fn()));

@@ -9,13 +9,7 @@
 
 import "dotenv/config";
 import http from "http";
-import { fetchRemoteOKJobs } from "./sources/remoteok.js";
-import { fetchHimalayasJobs } from "./sources/himalayas.js";
-import { fetchArbeitnowJobs } from "./sources/arbeitnow.js";
-import { fetchWWRJobs } from "./sources/wwr.js";
 import { fetchATSJobs } from "./sources/ats.js";
-import { fetchRemotiveJobs } from "./sources/remotive.js";
-import { fetchJobicyJobs } from "./sources/jobicy.js";
 import { fetchGitHubInternships } from "./sources/github_internships.js";
 import { fetchLinkedInJobs } from "./sources/linkedin.js";
 import { fetchWellfoundJobs } from "./sources/wellfound.js";
@@ -25,7 +19,7 @@ import { fetchIndeedRSSJobs } from "./sources/indeed_rss.js";
 import { fetchInternshalaJobs } from "./sources/internshala.js";
 import { fetchUnstopJobs } from "./sources/unstop.js";
 import { fetchDevToJobs } from "./sources/devto_jobs.js";
-import { fetchJustRemoteJobs } from "./sources/justremote.js";
+import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
 import { fetchIndiaAggregatorJobs } from "./sources/india_aggregators.js";
 import { runPipeline } from "./pipeline.js";
@@ -34,31 +28,25 @@ import { runPipeline } from "./pipeline.js";
 const FAST_POLL_INTERVAL_MIN = parseInt(process.env.FAST_POLL_INTERVAL_MIN || "3", 10);
 const DEEP_SCRAPE_INTERVAL_MIN = parseInt(process.env.DEEP_SCRAPE_INTERVAL_MIN || "60", 10);
 
-// ── FAST INSTANT SOURCES (Lightweight JSON APIs, RSS & ATS) ─────────
+// ── FAST INSTANT SOURCES (Lightweight Indian APIs, RSS & Target ATS) ─────
 const fastSources = [
-  { name: "ATS Direct (Greenhouse & Lever 80+ Companies)", fn: fetchATSJobs },
+  { name: "ATS Direct (Greenhouse & Lever Target Companies)", fn: fetchATSJobs },
   { name: "Indeed India RSS", fn: fetchIndeedRSSJobs },
-  { name: "Reddit Jobs (.json feeds)", fn: fetchRedditJobs },
+  { name: "GitHub Open Internships (India/Remote)", fn: fetchGitHubInternships },
+  { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
   { name: "Dev.to Jobs API", fn: fetchDevToJobs },
-  { name: "GitHub Open Internships", fn: fetchGitHubInternships },
   { name: "HN Who's Hiring API", fn: fetchHNHiringJobs },
-  { name: "Remotive API", fn: fetchRemotiveJobs },
-  { name: "RemoteOK API", fn: fetchRemoteOKJobs },
-  { name: "Himalayas API", fn: fetchHimalayasJobs },
-  { name: "Arbeitnow API", fn: fetchArbeitnowJobs },
-  { name: "WeWorkRemotely RSS", fn: fetchWWRJobs },
-  { name: "Jobicy API", fn: fetchJobicyJobs },
 ];
 
-// ── DEEP SCRAPING SOURCES (Heavy Scrapers & Aggregators) ─────────────
+// ── DEEP SCRAPING SOURCES (Heavy Indian Scrapers & Aggregators) ───────────
 const deepSources = [
   { name: "LinkedIn India", fn: fetchLinkedInJobs },
   { name: "Internshala Scraper", fn: fetchInternshalaJobs },
   { name: "Unstop Scraper", fn: fetchUnstopJobs },
   { name: "Naukri RSS & Aggregator", fn: fetchNaukriJobs },
   { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
-  { name: "Wellfound (AngelList)", fn: fetchWellfoundJobs },
-  { name: "JustRemote & Freshersworld", fn: fetchJustRemoteJobs },
+  { name: "Wellfound India (AngelList)", fn: fetchWellfoundJobs },
+  { name: "Freshersworld India", fn: fetchFreshersworldJobs },
 ];
 
 function withTimeout(promise, ms, name) {
