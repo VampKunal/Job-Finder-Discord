@@ -61,6 +61,15 @@ const deepSources = [
   { name: "JustRemote & Freshersworld", fn: fetchJustRemoteJobs },
 ];
 
+function withTimeout(promise, ms, name) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout (${ms}ms) in ${name}`)), ms)
+    )
+  ]);
+}
+
 let isFastCycleRunning = false;
 let isDeepCycleRunning = false;
 
@@ -70,24 +79,34 @@ const server = http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "application/json" });
   res.end(JSON.stringify({
     status: "online",
-    service: "Job Discovery Bot v2",
+    service: "Job Discovery Bot v2 Daemon",
     uptimeSeconds: Math.floor(process.uptime()),
     timestamp: new Date().toISOString()
   }));
 });
 
-server.listen(PORT, () => {
-  console.log(`🌐 [HTTP Server] Health check server active on port ${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🌐 [HTTP Server] Health check server active on 0.0.0.0:${PORT}`);
 });
 
 async function runFastCycle() {
-  if (isFastCycleRunning) return;
+  if (isFastCycleRunning) {
+    console.log(`⚡ [Fast Micro-Poll] Skip: previous poll still running.`);
+    return;
+  }
   isFastCycleRunning = true;
   const startTime = new Date();
   console.log(`\n⚡ [Fast Micro-Poll] Started at ${startTime.toLocaleTimeString()}`);
 
+  const cycleTimeout = setTimeout(() => {
+    console.warn(`⚡ [Fast Micro-Poll Warning] Cycle exceeded safety limit (5 mins). Forcing lock reset.`);
+    isFastCycleRunning = false;
+  }, 5 * 60 * 1000);
+
   try {
-    const fetchResults = await Promise.allSettled(fastSources.map(s => s.fn()));
+    const fetchResults = await Promise.allSettled(
+      fastSources.map(s => withTimeout(s.fn(), 15000, s.name))
+    );
     const rawJobs = [];
 
     fetchResults.forEach((res, idx) => {
@@ -96,6 +115,8 @@ async function runFastCycle() {
           console.log(`   └─ ✅ ${fastSources[idx].name}: ${res.value.length} jobs`);
         }
         rawJobs.push(...res.value);
+      } else if (res.status === "rejected") {
+        console.warn(`   └─ ⚠️ ${fastSources[idx].name}: ${res.reason?.message || res.reason}`);
       }
     });
 
@@ -104,24 +125,37 @@ async function runFastCycle() {
   } catch (err) {
     console.error(`⚡ [Fast Micro-Poll Error]`, err.message);
   } finally {
+    clearTimeout(cycleTimeout);
     isFastCycleRunning = false;
   }
 }
 
 async function runDeepCycle() {
-  if (isDeepCycleRunning) return;
+  if (isDeepCycleRunning) {
+    console.log(`🔍 [Deep Scrape Batch] Skip: previous batch still running.`);
+    return;
+  }
   isDeepCycleRunning = true;
   const startTime = new Date();
   console.log(`\n🔍 [Deep Scrape Batch] Started at ${startTime.toLocaleTimeString()}`);
 
+  const cycleTimeout = setTimeout(() => {
+    console.warn(`🔍 [Deep Scrape Batch Warning] Cycle exceeded safety limit (15 mins). Forcing lock reset.`);
+    isDeepCycleRunning = false;
+  }, 15 * 60 * 1000);
+
   try {
-    const fetchResults = await Promise.allSettled(deepSources.map(s => s.fn()));
+    const fetchResults = await Promise.allSettled(
+      deepSources.map(s => withTimeout(s.fn(), 45000, s.name))
+    );
     const rawJobs = [];
 
     fetchResults.forEach((res, idx) => {
       if (res.status === "fulfilled" && Array.isArray(res.value)) {
         console.log(`   └─ ✅ ${deepSources[idx].name}: ${res.value.length} jobs`);
         rawJobs.push(...res.value);
+      } else if (res.status === "rejected") {
+        console.warn(`   └─ ⚠️ ${deepSources[idx].name}: ${res.reason?.message || res.reason}`);
       }
     });
 
@@ -130,6 +164,7 @@ async function runDeepCycle() {
   } catch (err) {
     console.error(`🔍 [Deep Scrape Batch Error]`, err.message);
   } finally {
+    clearTimeout(cycleTimeout);
     isDeepCycleRunning = false;
   }
 }
@@ -141,13 +176,13 @@ async function startDaemon() {
   console.log(`⏱️  Deep Scrape Batch Interval : Every ${DEEP_SCRAPE_INTERVAL_MIN} minutes`);
   console.log(`====================================================\n`);
 
-  // Run initial fast & deep cycles on startup
-  await runFastCycle();
-  await runDeepCycle();
+  // Start continuous interval timers immediately
+  setInterval(() => runFastCycle().catch(err => console.error(`[Fast Cycle Error]`, err)), FAST_POLL_INTERVAL_MIN * 60 * 1000);
+  setInterval(() => runDeepCycle().catch(err => console.error(`[Deep Cycle Error]`, err)), DEEP_SCRAPE_INTERVAL_MIN * 60 * 1000);
 
-  // Schedule intervals
-  setInterval(runFastCycle, FAST_POLL_INTERVAL_MIN * 60 * 1000);
-  setInterval(runDeepCycle, DEEP_SCRAPE_INTERVAL_MIN * 60 * 1000);
+  // Trigger initial cycles asynchronously without blocking timer setup
+  runFastCycle().catch(err => console.error(`[Fast Init Error]`, err));
+  runDeepCycle().catch(err => console.error(`[Deep Init Error]`, err));
 }
 
 startDaemon().catch((err) => {

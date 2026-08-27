@@ -5,7 +5,8 @@
   "main": "src/scrape.js",
   "type": "module",
   "scripts": {
-    "start": "node src/scrape.js",
+    "start": "node src/daemon.js",
+    "scrape": "node src/scrape.js",
     "daemon": "node src/daemon.js"
   },
   "dependencies": {

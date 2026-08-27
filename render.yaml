@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: job-discovery-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 3000
+      - key: FAST_POLL_INTERVAL_MIN
+        value: 3
+      - key: DEEP_SCRAPE_INTERVAL_MIN
+        value: 60
+      - key: MAX_JOBS_PER_RUN
+        value: 40
+      - key: MIN_SCORE_THRESHOLD
+        value: 6
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
