@@ -15,7 +15,7 @@
 // ─── INDIA-SPECIFIC SOURCES (auto-pass location check) ───────────────────────
 const INDIA_SOURCES = [
   "internshala", "unstop", "freshersworld", "naukri", "indeed rss (india",
-  "linkedin public"
+  "linkedin public", "interndoor"
 ];
 
 // ─── INDIAN CITIES & MARKERS ─────────────────────────────────────────────────
@@ -283,8 +283,22 @@ export function matchesKeywords(job) {
   const titleLower = (job.title || "").toLowerCase();
   const textLower = `${job.title} ${job.description}`.toLowerCase();
 
-  // 0. Exclude non-job section headers scraped from website footers/navbars
+  // 0a. STRICTLY REJECT any GitHub sources, GitHub links, or GitHub repo jobs
+  const sourceLower = (job.source || "").toLowerCase();
+  const linkLower = (job.link || "").toLowerCase();
+  const idLower = (job.id || "").toLowerCase();
+  if (sourceLower.includes("github") || linkLower.includes("github.com") || idLower.startsWith("gh-")) {
+    return false;
+  }
+
+  // 0b. Exclude non-job section headers scraped from website footers/navbars
   if (JUNK_TITLE_EXCLUSIONS.some(junk => titleLower.includes(junk))) {
+    return false;
+  }
+
+  // 0c. Exclude blog post articles, listicles, or roundups (e.g. "8 Remote SWE Jobs...", "These Companies Want Interns...")
+  const listicleRegex = /\b\d+\s+(?:[a-z0-9\-]+\s+){0,3}(?:jobs|internships|roles|opportunities|companies|sites|places|openings)\b|\btop\s+\d+\b|\bhow to (?:get|find|land|apply|ace|pass|prepare)\b|\bguide to\b|\bbest (?:websites|platforms|places|repos|repositories|tools) (?:to|for)\b|\b(?:job|jobs|hiring|internship|internships)\s+(?:roundup|round-up|round up|list|bulletin)\b|\blist of (?:remote|tech|software|internship|fresher)\b|\byou can apply to\b|\bthese companies want\b|\bcompanies (?:want|hiring|that hire)\b|\bactive opportunities\b/i;
+  if (listicleRegex.test(titleLower)) {
     return false;
   }
 

@@ -10,6 +10,7 @@
  */
 
 import Groq from "groq-sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import fs from "fs";
 import path from "path";
 import { isDelhiNCRLocation, isRemotePaidJob, isFakeJob, requiresSeniorExperience } from "./filter.js";
@@ -18,6 +19,11 @@ import { scrapeJobPageText } from "./page_scraper.js";
 let groq = null;
 if (process.env.GROQ_API_KEY) {
   groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+}
+
+let gemini = null;
+if (process.env.GEMINI_API_KEY) {
+  gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 }
 
 // Active Groq models in order of priority
@@ -434,9 +440,57 @@ Respond ONLY with valid JSON:
       };
     } catch (err) {
       console.warn(`[Score] Groq model ${modelId} attempt failed for "${job.title}": ${err.message}`);
-      if (err.status === 429 || (err.message && err.message.includes("429"))) {
+      if (err.status === 429 || (err.message && err.message.includes("429")) || err.message.includes("Rate limit")) {
         await new Promise(r => setTimeout(r, 1200));
       }
+    }
+  }
+
+  // Fallback to Gemini if Groq fails
+  if (gemini) {
+    try {
+      const model = gemini.getGenerativeModel({ model: "gemini-3.8-flash", generationConfig: { temperature: 0.1 } });
+      const result = await model.generateContent(prompt);
+      const raw = result.response.text().trim();
+      const noThink = raw.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+      const match = noThink.match(/\{[\s\S]*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+
+        const rawCandidates = Array.isArray(parsed.candidates) ? parsed.candidates : [];
+        const sanitizedCandidates = profiles.map((p, idx) => {
+          const rawC = rawCandidates[idx] || rawCandidates.find(c => (c.name || "").toLowerCase().includes(p.name.split(" ")[0].toLowerCase())) || {};
+          let score = typeof rawC.score === "number" ? rawC.score : 4;
+
+          if (isDelhiNCR && score >= 5 && score < 10) {
+            score = Math.min(10, score + 1);
+          } else if (isRemotePaid && score >= 5 && score < 10) {
+            score = Math.min(10, score + 1);
+          }
+
+          const elig = isDelhiNCR ? "📍 Delhi-NCR" : isRemotePaid ? "🏠💰 Remote Paid" : (rawC.remoteEligible || "Yes (India)");
+
+          return {
+            name: p.name,
+            score,
+            remoteEligible: elig,
+            reason: rawC.reason || "Evaluated by AI model."
+          };
+        });
+
+        const bestMatchSanitized = sanitizeBestMatch(parsed.bestMatch, profiles);
+        const maxScore = Math.max(...sanitizedCandidates.map(c => c.score || 0), 0);
+
+        console.log(`[Score] ✅ Gemini fallback succeeded for "${job.title}"`);
+        return {
+          bestMatch: bestMatchSanitized,
+          favoredReason: parsed.favoredReason || "Matched candidate skills.",
+          maxScore,
+          candidates: sanitizedCandidates
+        };
+      }
+    } catch (err) {
+      console.warn(`[Score] Gemini fallback attempt failed for "${job.title}": ${err.message}`);
     }
   }
 

@@ -10,7 +10,6 @@
 import "dotenv/config";
 import http from "http";
 import { fetchATSJobs } from "./sources/ats.js";
-import { fetchGitHubInternships } from "./sources/github_internships.js";
 import { fetchLinkedInJobs } from "./sources/linkedin.js";
 import { fetchWellfoundJobs } from "./sources/wellfound.js";
 import { fetchHNHiringJobs } from "./sources/hn_hiring.js";
@@ -22,6 +21,7 @@ import { fetchDevToJobs } from "./sources/devto_jobs.js";
 import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
 import { fetchIndiaAggregatorJobs } from "./sources/india_aggregators.js";
+import { fetchInternDoorJobs } from "./sources/interndoor.js";
 import { runPipeline } from "./pipeline.js";
 
 // Configurable intervals via environment variables (in minutes)
@@ -32,7 +32,6 @@ const DEEP_SCRAPE_INTERVAL_MIN = parseInt(process.env.DEEP_SCRAPE_INTERVAL_MIN |
 const fastSources = [
   { name: "ATS Direct (Greenhouse & Lever Target Companies)", fn: fetchATSJobs },
   { name: "Indeed India RSS", fn: fetchIndeedRSSJobs },
-  { name: "GitHub Open Internships (India/Remote)", fn: fetchGitHubInternships },
   { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
   { name: "Dev.to Jobs API", fn: fetchDevToJobs },
   { name: "HN Who's Hiring API", fn: fetchHNHiringJobs },
@@ -42,6 +41,7 @@ const fastSources = [
 const deepSources = [
   { name: "LinkedIn India", fn: fetchLinkedInJobs },
   { name: "Internshala Scraper", fn: fetchInternshalaJobs },
+  { name: "InternDoor Internships", fn: fetchInternDoorJobs },
   { name: "Unstop Scraper", fn: fetchUnstopJobs },
   { name: "Naukri RSS & Aggregator", fn: fetchNaukriJobs },
   { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },

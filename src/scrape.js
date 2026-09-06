@@ -5,7 +5,6 @@
 
 import "dotenv/config";
 import { fetchATSJobs } from "./sources/ats.js";
-import { fetchGitHubInternships } from "./sources/github_internships.js";
 import { fetchLinkedInJobs } from "./sources/linkedin.js";
 import { fetchWellfoundJobs } from "./sources/wellfound.js";
 import { fetchHNHiringJobs } from "./sources/hn_hiring.js";
@@ -17,6 +16,7 @@ import { fetchDevToJobs } from "./sources/devto_jobs.js";
 import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
 import { fetchIndiaAggregatorJobs } from "./sources/india_aggregators.js";
+import { fetchInternDoorJobs } from "./sources/interndoor.js";
 import { runPipeline } from "./pipeline.js";
 
 async function main() {
@@ -31,11 +31,11 @@ async function main() {
     { name: "Internshala", fn: fetchInternshalaJobs },
     { name: "Unstop", fn: fetchUnstopJobs },
     { name: "Naukri RSS", fn: fetchNaukriJobs },
+    { name: "InternDoor Internships", fn: fetchInternDoorJobs },
     { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
     { name: "Wellfound India", fn: fetchWellfoundJobs },
     { name: "Freshersworld India", fn: fetchFreshersworldJobs },
     { name: "ATS Direct (Greenhouse/Lever)", fn: fetchATSJobs },
-    { name: "GitHub Open Internships", fn: fetchGitHubInternships },
     { name: "HN Who's Hiring (India/Remote)", fn: fetchHNHiringJobs },
     { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
     { name: "Dev.to Jobs", fn: fetchDevToJobs },
