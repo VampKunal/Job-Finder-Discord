@@ -12,19 +12,23 @@
  * - Fake / Scam / Unpaid / Experience-Letter-Only positions
  */
 
-// ─── INDIA-SPECIFIC SOURCES (auto-pass location check) ───────────────────────
+// ─── INDIA-SPECIFIC SOURCES (trusted Indian platforms) ──────────────────────
 const INDIA_SOURCES = [
-  "internshala", "unstop", "freshersworld", "naukri", "indeed rss (india",
-  "linkedin public", "interndoor"
+  "internshala", "unstop", "freshersworld", "naukri", "indeed india"
 ];
 
-// ─── INDIAN CITIES & MARKERS ─────────────────────────────────────────────────
+// ─── INDIAN CITIES & TECH HUBS ───────────────────────────────────────────────
 const INDIA_LOCATION_MARKERS = [
-  "india", "bangalore", "bengaluru", "mumbai", "delhi", "new delhi",
-  "hyderabad", "pune", "chennai", "kolkata", "noida", "gurgaon", "gurugram",
-  "ahmedabad", "jaipur", "chandigarh", "lucknow", "kochi", "thiruvananthapuram",
-  "indore", "bhopal", "coimbatore", "nagpur", "surat", "vadodara",
-  "work from home", "wfh", "pan india", "anywhere in india"
+  "india", "bangalore", "bengaluru", "delhi", "new delhi", "noida", "greater noida",
+  "gurgaon", "gurugram", "faridabad", "ghaziabad", "ncr", "delhi-ncr", "delhi ncr",
+  "mumbai", "navi mumbai", "thane", "pune", "hyderabad", "secunderabad", "chennai",
+  "kolkata", "ahmedabad", "gandhinagar", "jaipur", "chandigarh", "mohali", "panchkula",
+  "lucknow", "kanpur", "kochi", "cochin", "thiruvananthapuram", "trivandrum", "indore",
+  "bhopal", "coimbatore", "nagpur", "surat", "vadodara", "mysore", "mysuru", "bhubaneswar",
+  "visakhapatnam", "vizag", "patna", "ranchi", "guwahati", "dehradun", "karnataka",
+  "maharashtra", "telangana", "tamil nadu", "uttar pradesh", "haryana", "kerala",
+  "gujarat", "rajasthan", "west bengal", "work from home", "wfh", "pan india",
+  "anywhere in india", "remote (india)", "remote - india", "india (remote)"
 ];
 
 // ─── GLOBAL REMOTE MARKERS (allow India candidates) ──────────────────────────
@@ -55,18 +59,29 @@ const FOREIGN_ONLY_RESTRICTIONS = [
   "us residents only", "canadian residents", "european residents"
 ];
 
-// ─── FOREIGN ON-SITE CITIES (reject if not explicitly remote) ────────────────
-const FOREIGN_ONSITE_CITIES = [
+// ─── FOREIGN COUNTRIES & CITIES (Instant Reject if found in location without India) ───
+const FOREIGN_COUNTRIES_AND_CITIES = [
+  // Countries
+  "united states", "usa", "u.s.", "uk", "united kingdom", "great britain", "england", "scotland",
+  "canada", "germany", "deutschland", "france", "australia", "netherlands", "holland", "ireland",
+  "poland", "spain", "sweden", "switzerland", "singapore", "japan", "israel", "brazil", "mexico",
+  "italy", "new zealand", "philippines", "nigeria", "kenya", "south africa", "taiwan", "china",
+  "hong kong", "south korea", "norway", "denmark", "finland", "belgium", "austria", "portugal",
+  "czech", "romania", "hungary", "bulgaria", "colombia", "argentina", "chile", "vietnam", "thailand",
+  "indonesia", "malaysia", "uae", "dubai", "abu dhabi", "saudi arabia", "qatar", "egypt",
+
+  // Major Foreign Cities & Tech Metros
   "san francisco", "new york", "nyc", "austin", "seattle", "chicago", "boston",
   "los angeles", "denver", "portland", "miami", "atlanta", "dallas", "houston",
   "washington dc", "dc metro", "bay area", "silicon valley", "palo alto",
-  "mountain view", "menlo park", "cupertino", "redmond", "pittsburgh",
-  "london", "manchester", "cambridge uk", "edinburgh", "bristol",
-  "munich", "münchen", "berlin", "hamburg", "frankfurt", "düsseldorf",
+  "mountain view", "menlo park", "cupertino", "redmond", "pittsburgh", "sunnyvale",
+  "san jose", "san diego", "salt lake city", "raleigh", "charlotte", "philadelphia",
+  "london", "manchester", "cambridge uk", "edinburgh", "bristol", "birmingham",
+  "munich", "münchen", "berlin", "hamburg", "frankfurt", "düsseldorf", "cologne", "köln",
   "paris", "amsterdam", "rotterdam", "dublin", "barcelona", "madrid", "lisbon",
-  "toronto", "vancouver", "montreal", "ottawa", "calgary",
-  "sydney", "melbourne", "brisbane", "auckland",
-  "singapore", "tokyo", "hong kong", "seoul", "shanghai", "beijing",
+  "toronto", "vancouver", "montreal", "ottawa", "calgary", "waterloo",
+  "sydney", "melbourne", "brisbane", "auckland", "wellington",
+  "tokyo", "seoul", "shanghai", "beijing", "shenzhen",
   "tel aviv", "são paulo", "buenos aires", "mexico city"
 ];
 
@@ -333,52 +348,53 @@ export function matchesKeywords(job) {
 
 /**
  * STRICT India-eligibility check.
- * The key insight: instead of trying to block every foreign country,
- * we REQUIRE proof that India candidates can apply.
+ * Strictly guarantees jobs are located in India or are verified global remote accessible to India.
  */
 export function isLocationEligible(job) {
-  const locLower = (job.location || "").toLowerCase();
+  const locLower = (job.location || "").toLowerCase().trim();
   const descLower = (job.description || "").toLowerCase();
   const sourceLower = (job.source || "").toLowerCase();
-  const textLower = `${job.title} ${locLower} ${descLower}`.toLowerCase();
+  const titleLower = (job.title || "").toLowerCase();
+  const textLower = `${titleLower} ${locLower} ${descLower}`;
 
-  // ── STEP 1: Instant REJECT if explicit foreign-only restriction ────────
+  // ── STEP 1: Instant REJECT if explicit foreign-only restriction in text ──
   if (FOREIGN_ONLY_RESTRICTIONS.some(r => textLower.includes(r))) {
     return false;
   }
 
-  // ── STEP 2: Auto-PASS if from an India-specific source ─────────────────
+  // ── STEP 2: Instant REJECT if location names foreign countries/cities/US states without India ──
+  const hasIndiaMarker = INDIA_LOCATION_MARKERS.some(m => locLower.includes(m) || titleLower.includes(m));
+  
+  if (!hasIndiaMarker) {
+    if (FOREIGN_COUNTRIES_AND_CITIES.some(f => locLower.includes(f))) {
+      return false;
+    }
+    // Check for US state abbreviation patterns like ", CA", ", NY", ", TX", " San Francisco, CA"
+    if (/,\s*(ca|ny|tx|wa|ma|il|fl|nc|ga|co|pa|va|oh|nj|mi|az|or|ut|md|dc|mo|mn|in|tn|wi|ct)\b/i.test(job.location || "")) {
+      return false;
+    }
+  }
+
+  // ── STEP 3: PASS if location or title explicitly contains India or Indian cities ──
+  if (hasIndiaMarker) {
+    return true;
+  }
+
+  // ── STEP 4: PASS if from trusted India-only platforms ──────────────────
   if (INDIA_SOURCES.some(s => sourceLower.includes(s))) {
     return true;
   }
 
-  // ── STEP 3: PASS if location explicitly mentions India ─────────────────
-  if (INDIA_LOCATION_MARKERS.some(m => locLower.includes(m) || descLower.includes(m))) {
-    return true;
-  }
-
-  // ── STEP 4: PASS if explicitly "global/worldwide/anywhere" remote ──────
+  // ── STEP 5: PASS if explicitly verified Worldwide / Global Remote ──────
   if (GLOBAL_REMOTE_MARKERS.some(m => locLower.includes(m) || textLower.includes(m))) {
-    return true;
-  }
-
-  // ── STEP 5: REJECT if location is a foreign city without remote ────────
-  if (FOREIGN_ONSITE_CITIES.some(city => locLower.includes(city))) {
-    return false;
-  }
-
-  // ── STEP 6: For purely "Remote" jobs without any geo qualifier ─────────
-  if (/^remote$/i.test(locLower.trim()) || locLower.includes("unspecified")) {
-    const hasForeignHint = /\b(us|usa|united states|uk|canada|europe|eu|germany|france|australia)\b/i.test(descLower)
-      && !/\bindia\b|\bworldwide\b|\bglobal\b|\banywhere\b/i.test(descLower);
-    if (hasForeignHint) {
-      return false;
+    // Ensure no foreign hints
+    const hasForeignHint = /\b(us|usa|united states|uk|canada|europe|eu|germany|france|australia)\b/i.test(locLower);
+    if (!hasForeignHint) {
+      return true;
     }
-    const isFresherJob = FRESHER_BOOST_KEYWORDS.some(k => textLower.includes(k));
-    return isFresherJob;
   }
 
-  // ── STEP 7: Default REJECT ─────────────────────────────────────────────
+  // ── STEP 6: Default REJECT (drop anything non-India or ambiguous) ──────
   return false;
 }
 

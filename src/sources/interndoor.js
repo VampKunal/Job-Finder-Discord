@@ -7,9 +7,7 @@ import crypto from "crypto";
 import { fetchWithTimeout } from "../tools/fetch.js";
 
 const INTERNDOOR_FEEDS = [
-  { url: "https://interndoor.com/data/jobs.json", location: "India" },
-  { url: "https://interndoor.com/uk/data/jobs.json", location: "United Kingdom" },
-  { url: "https://interndoor.com/us/data/jobs.json", location: "United States" }
+  { url: "https://interndoor.com/data/jobs.json", location: "India" }
 ];
 
 export async function fetchInternDoorJobs() {
