@@ -54,7 +54,7 @@ const FOREIGN_NEGATIVE = [
 ];
 
 // Unwanted field titles to penalize in heuristic scoring
-const UNWANTED_ROLE_PATTERNS = /devops|sre|site reliability|sysadmin|system admin|data analyst|data analytics|business analyst|bi analyst|power bi|tableau|it support|helpdesk|telecaller|telecalling|bpo|kpo|manual tester|qa tester/i;
+const UNWANTED_ROLE_PATTERNS = /sales|business development|\bbde\b|\bbda\b|telesales|marketing|seo|content writer|copywriter|devops|sre|site reliability|sysadmin|system admin|data analyst|data analytics|business analyst|bi analyst|power bi|tableau|it support|helpdesk|telecaller|telecalling|bpo|kpo|manual tester|qa tester|customer service|customer support|recruiter|talent acquisition/i;
 
 /**
  * Load all candidate profiles from the profiles/ directory
@@ -360,7 +360,7 @@ STRICT TARGET FIELDS & 0-EXPERIENCE EVALUATION RULES:
 2. 0-EXPERIENCE / FRESHER FOCUS: High priority for jobs accepting freshers (0 exp, 0-1 yrs, 0-2 yrs, 0-3 yrs, interns, trainees, graduates, entry-level).
 3. SENIORITY REJECTION: REJECT & SCORE 1-2 MAX if the job strictly requires 2+ or 3+ years of experience without entry options for freshers.
 4. TARGET FIELDS ONLY: Full-Stack / Web / Software Engineering (React, Next.js, Node.js, Express, Python, C++) OR AI/ML/GenAI Engineering (LLMs, RAG, Computer Vision, PyTorch, TensorFlow).
-5. EXCLUDE & SCORE 1-2 MAX: DevOps, Site Reliability (SRE), SysAdmin, Data Analyst / Data Analytics, Business Intelligence, Telecalling, BPO, QA/Testing, or non-engineering roles.
+5. EXCLUDE & SCORE 1-2 MAX: Sales, Business Development (BDE/BDA), Marketing, SEO, Content, Telecalling, BPO, Helpdesk, DevOps, SRE, SysAdmin, Data Analytics / BI, QA/Testing, or non-software roles.
 6. LOCATION BOOST: BOTH candidates live in Delhi-NCR. Give a STRONG SCORE BOOST (+2) for jobs in NOIDA, GURGAON / GURUGRAM, DELHI, NEW DELHI, or DELHI-NCR! (Delhi NCR Job = ${isDelhiNCR ? "YES" : "NO"})
 7. REMOTE BOOST: Give a STRONG SCORE BOOST (+1.5) for REMOTE PAID jobs! (Remote Paid Job = ${isRemotePaid ? "YES" : "NO"})
 8. FRAUD REJECT: REJECT / SCORE 0-2 MAX if the job is UNPAID, Zero Stipend, Scam, Pay-to-work, Data Entry, Experience-Letter-Only, or fake.

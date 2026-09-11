@@ -86,45 +86,52 @@ const FOREIGN_COUNTRIES_AND_CITIES = [
 ];
 
 // ─── TARGET TECH TITLE KEYWORDS (Must match Full-Stack, Software, or AI/ML) ─
+// NOTE: Generic words like "intern", "fresher", "trainee", "associate", "graduate" must NOT be standalone tech keywords!
 const TECH_TITLE_KEYWORDS = [
   "software", "developer", "engineer", "frontend", "front-end", "backend", "back-end",
-  "fullstack", "full-stack", "full stack", "web", "ai", "ml", "machine learning",
+  "fullstack", "full-stack", "full stack", "web dev", "ai ", "ai/", "ai-", " ml", "ml ", "machine learning",
   "deep learning", "computer vision", "nlp", "natural language", "python", "react", "node",
-  "java", "c++", "cpp", "golang", "go developer", "rust", "typescript",
-  "intern", "internship", "fresher", "trainee", "apprentice",
-  "associate", "junior", "entry level", "entry-level", "graduate",
-  "sde", "swe", "sse", "mts",
-  "mobile", "android", "ios", "flutter", "react native",
-  "artificial intelligence", "genai", "generative ai", "llm", "rag"
+  "java", "c++", "cpp", "golang", "go developer", "rust", "typescript", "javascript",
+  "sde", "swe", "sse", "mts", "mearn", "mern", "mean stack",
+  "mobile developer", "android developer", "ios developer", "flutter", "react native",
+  "artificial intelligence", "genai", "generative ai", "llm", "rag", "prompt engineer",
+  "data engineer"
 ];
 
-// ─── UNWANTED FIELD EXCLUSIONS (DevOps, Data Analytics, Support, BPO, QA) ────
+// ─── UNWANTED FIELD EXCLUSIONS (Sales, Marketing, DevOps, Data Analytics, Support, BPO, QA, etc.) ────
 const UNWANTED_FIELD_EXCLUSIONS = [
-  // DevOps & Infrastructure (Not targeted by candidates)
+  // Sales, Business Development, Telesales, Direct Selling & Marketing
+  "sales", "business development", "bde", "bda", "telesales", "inside sales", "field sales",
+  "direct sales", "lead generation", "pre-sales", "presales", "sales executive", "sales intern",
+  "sales associate", "sales representative", "sales manager", "sales consultant", "sales advisor",
+  "account executive", "client acquisition", "relationship manager", "area sales", "channel sales",
+  "retail sales", "counter sales", "merchant onboarding", "store manager", "sales trainee",
+  "marketing", "digital marketing", "seo", "sem", "social media", "content writer", "copywriter",
+  "telecaller", "telecalling", "tele-caller", "telemarketing", "call center", "voice process",
+  "non-voice process", "non voice process", "outbound calling", "inbound calling", "customer support",
+  "customer service", "customer success", "client support", "chat support", "helpdesk", "desktop support",
+  "service desk", "bpo", "kpo", "back office", "data entry", "operations executive", "operations intern",
+
+  // DevOps & Infrastructure & SysAdmin (Not targeted)
   "devops", "sre", "site reliability", "system admin", "sysadmin", "infrastructure engineer",
   "cloud operations", "cloud architect", "network engineer", "linux administrator", "system administrator",
-  "build engineer", "release engineer",
+  "build engineer", "release engineer", "it admin", "it coordinator", "system support",
 
-  // Data Analytics & Business Intelligence (Not targeted by candidates)
+  // Data Analytics & Business Intelligence (Non-development / BI)
   "data analyst", "business intelligence", "bi analyst", "bi developer", "data analytics",
   "power bi", "tableau developer", "reporting analyst", "business analyst", "data operations",
-  "data entry analyst",
+  "data entry analyst", "excel analyst", "mis executive", "mis analyst",
 
-  // IT Support, BPO, Telecalling & Helpdesk
-  "it support", "technical support", "helpdesk", "desktop support", "service desk",
-  "it coordinator", "system support", "bpo", "kpo", "telecaller", "tele-caller",
-  "telecalling", "voice process", "non voice process", "back office", "chat support",
-
-  // Manual QA & Testing
+  // Manual QA & Non-Dev Testing
   "manual tester", "qa tester", "test analyst", "quality assurance analyst",
 
-  // Non-Tech / Corporate / Sales
-  "accounting", "accountant", "auditor", "hr generalist", "recruiter",
-  "human resources", "talent acquisition", "sales representative",
-  "business development", "marketing manager", "copywriter", "content writer",
-  "logistics", "legal counsel", "lawyer", "paralegal", "graphic designer",
-  "office manager", "receptionist", "customer service", "financial analyst",
-  "operations manager", "nurse", "physician", "pharmacist",
+  // Non-Tech / Corporate / Healthcare / Finance / HR
+  "accounting", "accountant", "auditor", "accounts executive", "hr generalist", "recruiter",
+  "human resources", "talent acquisition", "hr executive", "hr intern", "hr recruiter",
+  "logistics", "supply chain", "legal counsel", "lawyer", "paralegal", "graphic designer",
+  "ui/ux designer", "graphic design", "video editor", "office manager", "receptionist",
+  "financial analyst", "operations manager", "nurse", "physician", "pharmacist", "doctor",
+  "civil engineer", "mechanical engineer", "electrical engineer", "site engineer",
   "steuerfachangestellter", "bilanzbuchhalter", "projektkoordinator",
   "vertriebsmitarbeiter", "mediengestalter", "teamleiter", "pflege"
 ];
@@ -327,8 +334,20 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 3. Exclude Unwanted Fields (DevOps, Data Analytics, SysAdmin, Support, QA, Non-Tech)
-  if (UNWANTED_FIELD_EXCLUSIONS.some(e => titleLower.includes(e))) {
+  // 3. Exclude Unwanted Fields (Sales, Marketing, DevOps, Data Analytics, SysAdmin, Support, QA, Non-Tech)
+  const companyLower = (job.company || "").toLowerCase();
+  if (UNWANTED_FIELD_EXCLUSIONS.some(e => titleLower.includes(e) || companyLower.includes(e))) {
+    return false;
+  }
+
+  // Also check if description begins or is predominantly sales/telecalling
+  const descLower = (job.description || "").toLowerCase();
+  const salesDescIndicators = [
+    "cold calling", "lead generation", "sales target", "sales targets",
+    "outbound calls", "inbound calls", "telecalling", "telesales", "bpo process",
+    "field sales", "door to door", "selling products", "selling services"
+  ];
+  if (salesDescIndicators.some(s => descLower.includes(s))) {
     return false;
   }
 
@@ -337,7 +356,7 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 5. Require at least one target tech keyword in title
+  // 5. Require at least one target tech keyword in title (Full-Stack, Software, Web, AI/ML, SDE, etc.)
   const isTechTitle = TECH_TITLE_KEYWORDS.some(k => titleLower.includes(k));
   if (!isTechTitle) {
     return false;
