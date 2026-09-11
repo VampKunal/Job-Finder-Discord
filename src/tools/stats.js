@@ -1,22 +1,23 @@
-/**
- * Discovery Statistics Module (/stats)
- */
-
-import { Redis } from "@upstash/redis";
+import "dotenv/config";
+import { MongoClient } from "mongodb";
 import { loadProfiles } from "../score.js";
 
 export async function getBotStats() {
   const profiles = loadProfiles();
   let seenJobsCount = 0;
 
-  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+  if (process.env.MONGODB_URI) {
+    let client;
     try {
-      const redis = new Redis({
-        url: process.env.UPSTASH_REDIS_REST_URL,
-        token: process.env.UPSTASH_REDIS_REST_TOKEN,
-      });
-      seenJobsCount = await redis.scard("seen_jobs");
-    } catch (e) {}
+      client = new MongoClient(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 4000 });
+      await client.connect();
+      const db = client.db(process.env.MONGODB_DB_NAME || "job_bot");
+      seenJobsCount = await db.collection("seen_jobs").countDocuments();
+    } catch (e) {
+      console.warn(`[Stats] Error querying stats: ${e.message}`);
+    } finally {
+      if (client) await client.close().catch(() => {});
+    }
   }
 
   const candidateNames = profiles.map(p => p.name).join(", ");
@@ -25,6 +26,7 @@ export async function getBotStats() {
 • **Processed & Deduplicated Jobs**: ${seenJobsCount} listings tracked
 • **Active Candidates**: ${profiles.length} (${candidateNames})
 • **Live Data Sources**: 10 (LinkedIn, Wellfound, RemoteOK, Himalayas, Arbeitnow, WeWorkRemotely, Remotive, Jobicy, GitHub Internships, 38+ ATS Boards)
-• **LLM Scoring Engine**: Groq Llama-3.1 8B Instant
-• **Cron Schedule**: Every 2 hours`;
+• **Database Store**: MongoDB Atlas (512MB Free Tier, Unlimited Queries)
+• **LLM Scoring Engine**: Groq Llama-3.1 8B Instant / Gemini Fallback
+• **Fast Polling Interval**: Every ${process.env.FAST_POLL_INTERVAL_MIN || 3} mins`;
 }

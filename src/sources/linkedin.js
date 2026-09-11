@@ -47,7 +47,7 @@ export async function fetchLinkedInJobs() {
 
   async function processQuery(q) {
     try {
-      const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(q.keywords)}&location=${encodeURIComponent(q.location)}&start=0`;
+      const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(q.keywords)}&location=${encodeURIComponent(q.location)}&sortBy=DD&f_TPR=r86400&start=0`;
 
       const res = await fetchWithTimeout(url, {
         headers: {

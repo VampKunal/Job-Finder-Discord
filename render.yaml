@@ -20,7 +20,7 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
-      - key: UPSTASH_REDIS_REST_URL
+      - key: MONGODB_URI
         sync: false
-      - key: UPSTASH_REDIS_REST_TOKEN
-        sync: false
+      - key: MONGODB_DB_NAME
+        value: job_bot

@@ -22,7 +22,7 @@ export async function fetchRedditJobs() {
   for (const { sub, query, sort } of SUBREDDITS) {
     try {
       const url = query
-        ? `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(query)}&restrict_sr=on&sort=${sort}&t=week&limit=50`
+        ? `https://www.reddit.com/r/${sub}/search.json?q=${encodeURIComponent(query)}&restrict_sr=on&sort=${sort}&t=day&limit=50`
         : `https://www.reddit.com/r/${sub}/${sort}.json?limit=50`;
 
       const res = await fetch(url, {

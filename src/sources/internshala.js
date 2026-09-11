@@ -1,6 +1,6 @@
 /**
  * Internshala Job/Internship Fetcher (Optimized)
- * Uses Jina Reader to scrape Internshala's internship listings
+ * Extracts direct individual internship detail links via Jina Reader
  */
 
 import crypto from "crypto";
@@ -35,14 +35,24 @@ async function scrapePage(url, seen) {
       const trimmed = line.trim();
 
       if ((trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("**")) && trimmed.length > 10) {
-        if (currentJob && currentJob.title && currentJob.description.length > 50) {
+        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 50) {
           jobs.push(currentJob);
         }
 
-        const titleClean = trimmed.replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim();
+        const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+        const titleClean = linkMatch
+          ? linkMatch[1].replace(/\*\*/g, "").trim()
+          : trimmed.replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim();
+
         if (titleClean.length < 5) continue;
 
-        const stableKey = `internshala_${titleClean}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const directLink = linkMatch ? linkMatch[2].trim() : null;
+        if (!directLink || !directLink.includes("/detail/")) {
+          currentJob = null;
+          continue;
+        }
+
+        const stableKey = `internshala_${titleClean}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (seen.has(stableKey)) continue;
         seen.add(stableKey);
 
@@ -52,7 +62,7 @@ async function scrapePage(url, seen) {
           id: `internshala-${hash}`,
           title: titleClean.substring(0, 150),
           company: "Internshala Employer",
-          link: "https://internshala.com/internships",
+          link: directLink,
           location: "India / Work From Home",
           description: "",
           date: new Date().toISOString(),
@@ -72,7 +82,7 @@ async function scrapePage(url, seen) {
         }
       }
     }
-    if (currentJob && currentJob.title && currentJob.description.length > 50) {
+    if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 50) {
       jobs.push(currentJob);
     }
   } catch (e) {

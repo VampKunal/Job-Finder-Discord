@@ -407,16 +407,50 @@ export function isGhostListing(job) {
 }
 
 /**
- * Master filter: ghost check + fake/unpaid check + keyword + location
+ * Validate that the job has a real, specific application URL (not generic category, homepage, or placeholder)
+ */
+export function isValidJobUrl(job) {
+  if (!job.link || typeof job.link !== "string") return false;
+  const link = job.link.trim();
+  if (!/^https?:\/\//i.test(link)) return false;
+
+  // Reject placeholder & test links
+  if (/example\.com|localhost|127\.0\.0\.1|placeholder/i.test(link)) return false;
+
+  // Reject generic search/category landing pages with no specific job post
+  const genericRoots = [
+    /^https?:\/\/(www\.)?internshala\.com\/internships\/?$/i,
+    /^https?:\/\/(www\.)?unstop\.com\/internships\/?$/i,
+    /^https?:\/\/(www\.)?unstop\.com\/jobs\/?$/i,
+    /^https?:\/\/(www\.)?wellfound\.com\/jobs\/?$/i,
+    /^https?:\/\/(www\.)?freshersworld\.com\/jobs\/category\/?/i,
+    /^https?:\/\/(www\.)?foundit\.in\/srp\/?/i,
+    /^https?:\/\/(www\.)?shine\.com\/job-search\/?/i,
+    /^https?:\/\/(www\.)?timesjobs\.com\/candidate\/?/i,
+  ];
+
+  if (genericRoots.some(regex => regex.test(link))) {
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Master filter: ghost check + fake/unpaid check + url check + keyword + location
  */
 export function filterJobs(jobs) {
-  const stats = { total: 0, ghosted: 0, fakeJobs: 0, notTech: 0, locationFail: 0, passed: 0 };
+  const stats = { total: 0, ghosted: 0, fakeJobs: 0, invalidUrls: 0, notTech: 0, locationFail: 0, passed: 0 };
 
   const result = jobs.filter(job => {
     stats.total++;
 
     if (isGhostListing(job)) {
       stats.ghosted++;
+      return false;
+    }
+    if (!isValidJobUrl(job)) {
+      stats.invalidUrls++;
       return false;
     }
     if (isFakeJob(job)) {
@@ -436,7 +470,7 @@ export function filterJobs(jobs) {
     return true;
   });
 
-  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Target-Tech/Senior/DevOps/DataAnalyst: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
+  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Invalid URLs: ${stats.invalidUrls} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Target-Tech/Senior/DevOps/DataAnalyst: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }
 

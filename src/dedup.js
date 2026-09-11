@@ -1,81 +1,118 @@
-/**
- * Upstash Redis Deduplication Store with Dual-Layer Deduplication (Job ID + Company & Title)
- * Batch-Optimized for ultra-fast execution (<1s)
- */
-
-import { Redis } from "@upstash/redis";
+import "dotenv/config";
+import { MongoClient } from "mongodb";
 import crypto from "crypto";
 
-const fallbackSet = new Set();
-let redisClient = null;
+const inMemoryCache = new Set();
+let mongoClient = null;
+let seenJobsCol = null;
+let initPromise = null;
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  try {
-    redisClient = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
-  } catch (err) {
-    console.warn(`[Dedup] Failed to initialize Upstash Redis: ${err.message}. Falling back to in-memory set.`);
+async function getCollection() {
+  if (seenJobsCol) return seenJobsCol;
+  if (!process.env.MONGODB_URI) {
+    return null;
   }
-} else {
-  console.warn("[Dedup] UPSTASH_REDIS_REST_URL/TOKEN missing in environment. Using in-memory fallback.");
+
+  if (!initPromise) {
+    initPromise = (async () => {
+      try {
+        mongoClient = new MongoClient(process.env.MONGODB_URI, {
+          maxPoolSize: 10,
+          serverSelectionTimeoutMS: 5000,
+        });
+        await mongoClient.connect();
+        const db = mongoClient.db(process.env.MONGODB_DB_NAME || "job_bot");
+        const col = db.collection("seen_jobs");
+        await col.createIndex({ key: 1 }, { unique: true }).catch(() => {});
+        seenJobsCol = col;
+        console.log("[Dedup] Connected to MongoDB Atlas deduplication store.");
+        return col;
+      } catch (err) {
+        console.error(`[Dedup] Failed to connect to MongoDB: ${err.message}. Falling back to in-memory cache.`);
+        initPromise = null;
+        return null;
+      }
+    })();
+  }
+
+  return initPromise;
 }
 
-function getTitleCompanyKey(job) {
+export function getTitleCompanyKey(job) {
   const comp = (job.company || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const title = (job.title || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   return crypto.createHash("md5").update(`${comp}_${title}`).digest("hex").substring(0, 16);
 }
 
-async function checkAndAddJob(job) {
-  const jobId = job.id || getTitleCompanyKey(job);
-  const titleKey = getTitleCompanyKey(job);
-
-  if (redisClient) {
-    try {
-      const [addedId, addedTitle] = await Promise.all([
-        redisClient.sadd("seen_jobs", jobId),
-        redisClient.sadd("seen_job_titles", titleKey)
-      ]);
-
-      if (addedId === 1 && addedTitle === 1) {
-        return job;
-      }
-      return null;
-    } catch (err) {
-      console.error(`[Dedup] Redis sadd failed: ${err.message}. Using fallback.`);
-      if (!fallbackSet.has(jobId) && !fallbackSet.has(titleKey)) {
-        fallbackSet.add(jobId);
-        fallbackSet.add(titleKey);
-        return job;
-      }
-      return null;
-    }
-  } else {
-    if (!fallbackSet.has(jobId) && !fallbackSet.has(titleKey)) {
-      fallbackSet.add(jobId);
-      fallbackSet.add(titleKey);
-      return job;
-    }
-    return null;
-  }
-}
-
 /**
  * Filter an array of jobs, returning only jobs that haven't been seen before.
- * Runs Redis deduplication checks concurrently in chunks.
+ * Uses in-memory cache + single bulk query in MongoDB.
  */
 export async function deduplicateJobs(jobs) {
-  const newJobs = [];
-  const chunkSize = 25;
+  if (!jobs || jobs.length === 0) return [];
 
-  for (let i = 0; i < jobs.length; i += chunkSize) {
-    const chunk = jobs.slice(i, i + chunkSize);
-    const results = await Promise.all(chunk.map(job => checkAndAddJob(job)));
-    for (const res of results) {
-      if (res) newJobs.push(res);
+  const col = await getCollection();
+  const candidateJobs = [];
+  const candidateKeys = [];
+
+  for (const job of jobs) {
+    const jobId = job.id || getTitleCompanyKey(job);
+    const titleKey = getTitleCompanyKey(job);
+
+    // Fast check in memory cache
+    if (inMemoryCache.has(jobId) || inMemoryCache.has(titleKey)) {
+      continue;
     }
+
+    candidateJobs.push({ job, jobId, titleKey });
+    candidateKeys.push(jobId, titleKey);
+  }
+
+  if (candidateJobs.length === 0) {
+    return [];
+  }
+
+  // If MongoDB is available, query DB for any existing keys in bulk
+  let dbSeenSet = new Set();
+  if (col) {
+    try {
+      const existingDocs = await col
+        .find({ key: { $in: candidateKeys } }, { projection: { key: 1 } })
+        .toArray();
+
+      for (const doc of existingDocs) {
+        dbSeenSet.add(doc.key);
+        inMemoryCache.add(doc.key); // Populate memory cache
+      }
+    } catch (err) {
+      console.warn(`[Dedup] MongoDB bulk query error: ${err.message}. Using local memory cache.`);
+    }
+  }
+
+  const newJobs = [];
+  const newKeysToInsert = [];
+
+  for (const { job, jobId, titleKey } of candidateJobs) {
+    if (dbSeenSet.has(jobId) || dbSeenSet.has(titleKey)) {
+      continue;
+    }
+
+    // Mark in memory immediately
+    inMemoryCache.add(jobId);
+    inMemoryCache.add(titleKey);
+    newKeysToInsert.push({ key: jobId, createdAt: new Date() });
+    newKeysToInsert.push({ key: titleKey, createdAt: new Date() });
+    newJobs.push(job);
+  }
+
+  // Bulk insert new keys into MongoDB in background
+  if (col && newKeysToInsert.length > 0) {
+    col.insertMany(newKeysToInsert, { ordered: false }).catch((err) => {
+      // Ignore duplicate key errors (code 11000)
+      if (err.code !== 11000 && !err.writeErrors) {
+        console.warn(`[Dedup] MongoDB insertMany warning: ${err.message}`);
+      }
+    });
   }
 
   return newJobs;

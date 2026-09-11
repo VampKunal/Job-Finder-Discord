@@ -1,6 +1,6 @@
 /**
  * Discord Webhook Push Notification Module v2 — India-Fresher-First
- * Now shows India eligibility prominently in the embed
+ * Now includes Real-Time Freshness Badges (<1h / <24h) & Discord Relative Timestamps
  */
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -62,21 +62,45 @@ export async function pushToDiscord(job, scoreObj) {
     locationTag = "🌐 Remote";
   }
 
+  // Freshness calculation & Discord relative timestamp
+  let freshBadge = "";
+  let postedValue = "Recent";
+
+  if (job.date) {
+    const jobTime = new Date(job.date).getTime();
+    if (!isNaN(jobTime)) {
+      const diffMs = Date.now() - jobTime;
+      const unixSeconds = Math.floor(jobTime / 1000);
+      
+      if (diffMs <= 60 * 60 * 1000) { // Under 1 hour
+        freshBadge = "⚡ [JUST POSTED] ";
+        postedValue = `🔥 <t:${unixSeconds}:R>`;
+      } else if (diffMs <= 3 * 60 * 60 * 1000) { // Under 3 hours
+        freshBadge = "✨ [NEW] ";
+        postedValue = `⚡ <t:${unixSeconds}:R>`;
+      } else if (diffMs <= 24 * 60 * 60 * 1000) { // Under 24 hours
+        postedValue = `<t:${unixSeconds}:R>`;
+      } else {
+        postedValue = new Date(job.date).toLocaleDateString();
+      }
+    }
+  }
+
   // Meta fields
   fields.push(
     { name: "📍 Location", value: job.location || "Remote", inline: true },
     { name: "🏷️ Source", value: job.source || "Web", inline: true },
-    { name: "📅 Posted", value: job.date ? new Date(job.date).toLocaleDateString() : "Recent", inline: true }
+    { name: "📅 Posted", value: postedValue, inline: true }
   );
 
   const embed = {
-    title: `${emoji} [${locationTag}] ${job.title} @ ${job.company}`,
+    title: `${emoji} ${freshBadge}[${locationTag}] ${job.title} @ ${job.company}`,
     url: job.link,
     description: `🎯 **Favored For:** ${scoreObj.bestMatch}\n💡 ${scoreObj.favoredReason}`,
     color: color,
     fields: fields,
     footer: { text: `Job Bot v2 | India & Delhi-NCR Priority | ID: ${job.id}` },
-    timestamp: new Date().toISOString()
+    timestamp: job.date ? new Date(job.date).toISOString() : new Date().toISOString()
   };
 
   try {
@@ -91,7 +115,7 @@ export async function pushToDiscord(job, scoreObj) {
       return false;
     }
 
-    console.log(`[Discord] ✅ Pushed: ${locationTag} | ${job.title} @ ${job.company} [${scoreObj.bestMatch} | Score: ${maxScore}/10]`);
+    console.log(`[Discord] ✅ Pushed: ${freshBadge}${locationTag} | ${job.title} @ ${job.company} [${scoreObj.bestMatch} | Score: ${maxScore}/10]`);
 
     // Respect Discord rate limits
     await sleep(600);
@@ -101,4 +125,3 @@ export async function pushToDiscord(job, scoreObj) {
     return false;
   }
 }
-

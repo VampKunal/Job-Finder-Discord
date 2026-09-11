@@ -21,18 +21,31 @@ export async function fetchFreshersworldJobs() {
     for (const line of lines) {
       const t = line.trim();
       if ((t.startsWith("### ") || t.startsWith("## ")) && t.length > 10) {
-        if (cur && cur.title && cur.description.length > 30) jobs.push(cur);
-        const title = t.replace(/^[#*]+\s*/, "").replace(/\[|\]|\*\*/g, "").trim();
+        if (cur && cur.title && cur.link && cur.description.length > 30) jobs.push(cur);
+        
+        const linkMatch = t.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+        const title = linkMatch
+          ? linkMatch[1].replace(/\[|\]|\*\*/g, "").trim()
+          : t.replace(/^[#*]+\s*/, "").replace(/\[|\]|\*\*/g, "").trim();
+
         if (title.length < 5) continue;
-        const key = `freshersworld_${title}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+        const directLink = linkMatch ? linkMatch[2].trim() : null;
+        if (!directLink || !directLink.includes("/jobs/")) {
+          cur = null;
+          continue;
+        }
+
+        const key = `freshersworld_${title}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (seen.has(key)) continue;
         seen.add(key);
+
         const hash = crypto.createHash("md5").update(key).digest("hex").substring(0, 12);
         cur = { 
           id: `freshersworld-${hash}`, 
-          title: title.substring(0,150), 
+          title: title.substring(0, 150), 
           company: "Freshersworld Listing", 
-          link: "https://www.freshersworld.com/jobs/category/it-software-jobs", 
+          link: directLink, 
           location: "India", 
           description: "", 
           date: new Date().toISOString(), 
@@ -42,7 +55,7 @@ export async function fetchFreshersworldJobs() {
         cur.description += ` ${t}`;
       }
     }
-    if (cur && cur.title && cur.description.length > 30) jobs.push(cur);
+    if (cur && cur.title && cur.link && cur.description.length > 30) jobs.push(cur);
   } catch (e) {
     console.error(`[Freshersworld Error] ${e.message}`);
   }

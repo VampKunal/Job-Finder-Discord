@@ -1,46 +1,38 @@
 import "dotenv/config";
-import { Redis } from "@upstash/redis";
+import { MongoClient } from "mongodb";
 
-if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-  console.error("Missing UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN in environment.");
+if (!process.env.MONGODB_URI) {
+  console.error("Missing MONGODB_URI in environment.");
   process.exit(1);
 }
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+const client = new MongoClient(process.env.MONGODB_URI);
 
-async function cleanRedis() {
-  console.log("Fetching seen_jobs from Redis...");
-  const seenJobs = await redis.smembers("seen_jobs");
-  console.log(`Total seen_jobs in Redis: ${seenJobs.length}`);
+async function cleanMongo() {
+  await client.connect();
+  const db = client.db(process.env.MONGODB_DB_NAME || "job_bot");
+  const col = db.collection("seen_jobs");
 
-  const interndoorKeys = seenJobs.filter(id => id.includes("interndoor"));
-  const githubKeys = seenJobs.filter(id => id.includes("gh-") || id.includes("github"));
+  const totalBefore = await col.countDocuments();
+  console.log(`Total seen_jobs in MongoDB before clean: ${totalBefore}`);
 
-  console.log(`Found ${interndoorKeys.length} InternDoor keys to remove.`);
-  console.log(`Found ${githubKeys.length} GitHub keys to remove.`);
+  const deleteResult = await col.deleteMany({
+    $or: [
+      { key: { $regex: "interndoor", $options: "i" } },
+      { key: { $regex: "gh-", $options: "i" } },
+      { key: { $regex: "github", $options: "i" } },
+    ]
+  });
 
-  const toRemove = [...interndoorKeys, ...githubKeys];
+  console.log(`Deleted ${deleteResult.deletedCount} interndoor/github records.`);
 
-  if (toRemove.length > 0) {
-    const chunkSize = 100;
-    for (let i = 0; i < toRemove.length; i += chunkSize) {
-      const chunk = toRemove.slice(i, i + chunkSize);
-      await redis.srem("seen_jobs", ...chunk);
-    }
-    console.log(`Successfully removed ${toRemove.length} keys from seen_jobs.`);
-  }
+  const totalAfter = await col.countDocuments();
+  console.log(`Remaining seen_jobs count: ${totalAfter}`);
 
-  const remaining = await redis.smembers("seen_jobs");
-  console.log(`Remaining seen_jobs count: ${remaining.length}`);
-
-  await redis.del("seen_job_titles");
-  console.log("Cleared seen_job_titles set in Redis.");
+  await client.close();
 }
 
-cleanRedis().catch(err => {
-  console.error("Error cleaning Redis:", err);
+cleanMongo().catch(err => {
+  console.error("Error cleaning MongoDB:", err);
   process.exit(1);
 });

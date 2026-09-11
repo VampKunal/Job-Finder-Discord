@@ -1,5 +1,6 @@
 /**
  * Unstop (formerly D2C) Opportunities Fetcher (Optimized)
+ * Extracts direct opportunity links from markdown
  */
 
 import crypto from "crypto";
@@ -31,14 +32,24 @@ async function scrapePage(url, seen) {
       const trimmed = line.trim();
 
       if ((trimmed.startsWith("### ") || trimmed.startsWith("## ")) && trimmed.length > 10) {
-        if (currentJob && currentJob.title && currentJob.description.length > 30) {
+        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
           jobs.push(currentJob);
         }
 
-        const titleClean = trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, "").trim();
+        const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+        const titleClean = linkMatch
+          ? linkMatch[1].trim()
+          : trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, "").trim();
+
         if (titleClean.length < 5) continue;
 
-        const stableKey = `unstop_${titleClean}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const directLink = linkMatch ? linkMatch[2].trim() : null;
+        if (!directLink || (!directLink.includes("/internships/") && !directLink.includes("/jobs/") && !directLink.includes("/competitions/"))) {
+          currentJob = null;
+          continue;
+        }
+
+        const stableKey = `unstop_${titleClean}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (seen.has(stableKey)) continue;
         seen.add(stableKey);
 
@@ -48,7 +59,7 @@ async function scrapePage(url, seen) {
           id: `unstop-${hash}`,
           title: titleClean.substring(0, 150),
           company: "Unstop Employer",
-          link: "https://unstop.com/internships",
+          link: directLink,
           location: "India",
           description: "",
           date: new Date().toISOString(),
@@ -58,7 +69,7 @@ async function scrapePage(url, seen) {
         currentJob.description += ` ${trimmed}`;
       }
     }
-    if (currentJob && currentJob.title && currentJob.description.length > 30) {
+    if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
       jobs.push(currentJob);
     }
   } catch (e) {
