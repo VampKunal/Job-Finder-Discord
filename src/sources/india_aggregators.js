@@ -1,17 +1,13 @@
 /**
- * Google Jobs / SerpAPI-Free RSS Fetcher for India Fresher Jobs (Optimized)
+ * Google Jobs / Free India Aggregator Direct Listings Fetcher
+ * Only emits opportunities with verified individual job links (rejects search landing pages)
  */
 
 import crypto from "crypto";
 import { fetchWithTimeout } from "../tools/fetch.js";
 
-const GOOGLE_CAREER_PAGES = [
-  "https://r.jina.ai/https://www.google.com/about/careers/applications/jobs/results?location=India&target_level=INTERN_AND_APPRENTICE&category=SOFTWARE_ENGINEERING",
-  "https://r.jina.ai/https://www.google.com/about/careers/applications/jobs/results?location=India&target_level=EARLY&category=SOFTWARE_ENGINEERING"
-];
-
 const INDIA_JOB_PAGES = [
-  { url: "https://r.jina.ai/https://www.foundit.in/srp/results?searchType=personalised&query=software+intern&locations=india&experienceRanges=0~1", source: "Foundit (Monster India)", location: "India" },
+  { url: "https://r.jina.ai/https://www.foundit.in/srp/results?searchType=personalised&query=software+intern&locations=india&experienceRanges=0~1", source: "Foundit India", location: "India" },
   { url: "https://r.jina.ai/https://www.shine.com/job-search/software-engineer-fresher-jobs", source: "Shine", location: "India" },
   { url: "https://r.jina.ai/https://www.timesjobs.com/candidate/job-search.html?searchType=personalise&from=submit&searchTextSrc=&searchTextText=software+developer&txtKeywords=software+developer+fresher&txtLocation=india&cboWorkExp1=0", source: "TimesJobs", location: "India" }
 ];
@@ -38,14 +34,36 @@ async function scrapeJinaPage(url, source, location) {
       const trimmed = line.trim();
 
       if ((trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("**")) && trimmed.length > 10) {
-        if (currentJob && currentJob.title && currentJob.description.length > 30) {
+        // Push previous job if it has a real individual application link
+        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
           jobs.push(currentJob);
         }
+        currentJob = null;
 
-        const titleClean = trimmed.replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim();
+        // Must find a markdown link to a specific job post
+        const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+        if (!linkMatch) continue;
+
+        const directLink = linkMatch[2].trim();
+        // Reject if the link is just another search results or landing page
+        if (
+          !directLink ||
+          directLink.includes("/job-search") ||
+          directLink.includes("/srp/") ||
+          directLink.includes("/candidate/") ||
+          directLink.includes("/results?") ||
+          directLink.endsWith(".com") ||
+          directLink.endsWith(".in") ||
+          directLink.endsWith(".com/") ||
+          directLink.endsWith(".in/")
+        ) {
+          continue;
+        }
+
+        const titleClean = linkMatch[1].replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim();
         if (titleClean.length < 5) continue;
 
-        const stableKey = `${source}_${titleClean}`.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const stableKey = `${source}_${titleClean}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
         if (seen.has(stableKey)) continue;
         seen.add(stableKey);
 
@@ -54,8 +72,8 @@ async function scrapeJinaPage(url, source, location) {
         currentJob = {
           id: `${source.toLowerCase().replace(/[^a-z0-9]/g, "")}-${hash}`,
           title: titleClean.substring(0, 150),
-          company: `${source} Employer`,
-          link: url.replace("https://r.jina.ai/", ""),
+          company: `${source} Listing`,
+          link: directLink,
           location: location,
           description: "",
           date: new Date().toISOString(),
@@ -69,7 +87,8 @@ async function scrapeJinaPage(url, source, location) {
         }
       }
     }
-    if (currentJob && currentJob.title && currentJob.description.length > 30) {
+
+    if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
       jobs.push(currentJob);
     }
   } catch (e) {
@@ -80,11 +99,7 @@ async function scrapeJinaPage(url, source, location) {
 }
 
 export async function fetchIndiaAggregatorJobs() {
-  const tasks = [
-    ...GOOGLE_CAREER_PAGES.map(url => scrapeJinaPage(url, "Google Careers India", "India")),
-    ...INDIA_JOB_PAGES.map(p => scrapeJinaPage(p.url, p.source, p.location))
-  ];
-
+  const tasks = INDIA_JOB_PAGES.map(p => scrapeJinaPage(p.url, p.source, p.location));
   const results = await Promise.allSettled(tasks);
   const allJobs = [];
 
@@ -94,5 +109,5 @@ export async function fetchIndiaAggregatorJobs() {
     }
   }
 
-  return allJobs.slice(0, 80);
+  return allJobs.slice(0, 40);
 }

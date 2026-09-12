@@ -8,6 +8,7 @@ export async function fetchWellfoundJobs() {
     ];
 
     const jobs = [];
+    const seen = new Set();
 
     for (const url of targetUrls) {
       try {
@@ -27,24 +28,48 @@ export async function fetchWellfoundJobs() {
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed.startsWith("### ") || trimmed.startsWith("## ")) {
-            if (currentJob && currentJob.title) jobs.push(currentJob);
-            const titleClean = trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, "");
-            const stableHash = crypto.createHash("md5").update(`wf_${titleClean}`).digest("hex").substring(0, 12);
+            if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 20) {
+              jobs.push(currentJob);
+            }
+            currentJob = null;
+
+            const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
+            if (!linkMatch) continue;
+
+            const directLink = linkMatch[2].trim();
+            // Must be an actual job posting on Wellfound, not the generic homepage/jobs root
+            if (!directLink || directLink === "https://wellfound.com/jobs" || (!directLink.includes("/jobs/") && !directLink.includes("/company/"))) {
+              continue;
+            }
+
+            const titleClean = linkMatch[1].replace(/^[#*]+\s*/, "").replace(/\[|\]|\*\*/g, "").trim();
+            if (titleClean.length < 5) continue;
+
+            const stableHash = crypto.createHash("md5").update(`wf_${titleClean}_${directLink}`).digest("hex").substring(0, 12);
+            if (seen.has(stableHash)) continue;
+            seen.add(stableHash);
+
             currentJob = {
               id: `wf-${stableHash}`,
               title: titleClean,
               company: "Wellfound Startup",
-              link: "https://wellfound.com/jobs",
-              location: "Remote / India",
+              link: directLink,
+              location: "India / Remote",
               description: "",
               date: new Date().toISOString(),
               source: "Wellfound (AngelList)"
             };
           } else if (currentJob && trimmed.length > 20) {
-            currentJob.description += " " + trimmed;
+            if (/^at\s|^company:\s/i.test(trimmed)) {
+              currentJob.company = trimmed.replace(/^(at|company:)\s*/i, "").trim();
+            } else {
+              currentJob.description += " " + trimmed;
+            }
           }
         }
-        if (currentJob && currentJob.title) jobs.push(currentJob);
+        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 20) {
+          jobs.push(currentJob);
+        }
       } catch (e) {}
     }
 
@@ -54,4 +79,3 @@ export async function fetchWellfoundJobs() {
     return [];
   }
 }
-

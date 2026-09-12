@@ -1,15 +1,16 @@
 /**
- * India-Fresher-First Filter v3
+ * India-Fresher-First Filter v3.1 (Enhanced Dedup & Anti-Fake Shield)
  * 
  * Target Candidate Fields:
- * 1. Full-Stack / Frontend / Backend / Software Engineering (Web, React, Next.js, Node.js, Python, C++)
- * 2. AI / ML / Generative AI / RAG / Computer Vision / NLP Engineering
+ * 1. Full-Stack / Frontend / Backend / Software Engineering (Web, React, Next.js, Node.js, Python, C++, Java)
+ * 2. AI / ML / Generative AI / RAG / Computer Vision / NLP / Data Engineering
  * 
  * STRICTLY EXCLUDES:
  * - DevOps / SRE / SysAdmin / Cloud Operations
  * - Data Analytics / Business Intelligence / Data Entry / BI Analysts
- * - Telecalling / BPO / KPO / IT Support / Helpdesk
- * - Fake / Scam / Unpaid / Experience-Letter-Only positions
+ * - Telecalling / BPO / KPO / IT Support / Helpdesk / Sales / Marketing
+ * - Non-Software Engineering (Mechanical, Civil, Electrical, Manufacturing, Hardware, Structural)
+ * - Fake / Scam / Unpaid / Experience-Letter-Only positions / Job seeker posts / Aggregator Search Pages
  */
 
 // ─── INDIA-SPECIFIC SOURCES (trusted Indian platforms) ──────────────────────
@@ -85,20 +86,23 @@ const FOREIGN_COUNTRIES_AND_CITIES = [
   "tel aviv", "são paulo", "buenos aires", "mexico city"
 ];
 
-// ─── TARGET TECH TITLE KEYWORDS (Must match Full-Stack, Software, or AI/ML) ─
-// NOTE: Generic words like "intern", "fresher", "trainee", "associate", "graduate" must NOT be standalone tech keywords!
+// ─── TARGET TECH TITLE KEYWORDS (Software, Web, Full-Stack, AI/ML) ───────────
+// NOTE: Standalone "engineer" is intentionally NOT included to prevent non-software engineering leakage!
 const TECH_TITLE_KEYWORDS = [
-  "software", "developer", "engineer", "frontend", "front-end", "backend", "back-end",
-  "fullstack", "full-stack", "full stack", "web dev", "ai ", "ai/", "ai-", " ml", "ml ", "machine learning",
+  "software", "developer", "software engineer", "software engineering", "software dev",
+  "frontend", "front-end", "backend", "back-end",
+  "fullstack", "full-stack", "full stack", "web dev", "web engineer", "web developer",
+  "ai ", "ai/", "ai-", "ai engineer", " ml", "ml ", "ml engineer", "machine learning",
   "deep learning", "computer vision", "nlp", "natural language", "python", "react", "node",
   "java", "c++", "cpp", "golang", "go developer", "rust", "typescript", "javascript",
   "sde", "swe", "sse", "mts", "mearn", "mern", "mean stack",
   "mobile developer", "android developer", "ios developer", "flutter", "react native",
   "artificial intelligence", "genai", "generative ai", "llm", "rag", "prompt engineer",
-  "data engineer"
+  "data engineer", "systems software", "cloud software", "application engineer",
+  "graduate engineer trainee", "engineer trainee", "developer intern", "software intern", "coding intern"
 ];
 
-// ─── UNWANTED FIELD EXCLUSIONS (Sales, Marketing, DevOps, Data Analytics, Support, BPO, QA, etc.) ────
+// ─── UNWANTED FIELD EXCLUSIONS (Sales, Marketing, DevOps, Data Analytics, Non-Tech, Hardware) ────
 const UNWANTED_FIELD_EXCLUSIONS = [
   // Sales, Business Development, Telesales, Direct Selling & Marketing
   "sales", "business development", "bde", "bda", "telesales", "inside sales", "field sales",
@@ -125,13 +129,20 @@ const UNWANTED_FIELD_EXCLUSIONS = [
   // Manual QA & Non-Dev Testing
   "manual tester", "qa tester", "test analyst", "quality assurance analyst",
 
+  // Non-Software Engineering disciplines (Strictly excluded)
+  "manufacturing", "mechanical", "civil", "electrical", "electronics", "hardware", "embedded",
+  "vlsi", "hvac", "piping", "structural", "chemical", "biomedical", "automobile", "automotive",
+  "aeronautical", "aerospace", "cad engineer", "bim engineer", "revit", "site engineer",
+  "process engineer", "quality control", "qc engineer", "field engineer", "maintenance engineer",
+  "safety engineer", "welding", "metallurgy", "textile", "mining", "petroleum", "draftsman",
+
   // Non-Tech / Corporate / Healthcare / Finance / HR
   "accounting", "accountant", "auditor", "accounts executive", "hr generalist", "recruiter",
   "human resources", "talent acquisition", "hr executive", "hr intern", "hr recruiter",
   "logistics", "supply chain", "legal counsel", "lawyer", "paralegal", "graphic designer",
   "ui/ux designer", "graphic design", "video editor", "office manager", "receptionist",
   "financial analyst", "operations manager", "nurse", "physician", "pharmacist", "doctor",
-  "civil engineer", "mechanical engineer", "electrical engineer", "site engineer",
+  "pharmacovigilance", "clinical research",
   "steuerfachangestellter", "bilanzbuchhalter", "projektkoordinator",
   "vertriebsmitarbeiter", "mediengestalter", "teamleiter", "pflege"
 ];
@@ -153,6 +164,19 @@ const JUNK_TITLE_EXCLUSIONS = [
   "search results", "all rights reserved", "copyright", "why join us",
   "how to apply", "company overview", "explore opportunities", "view all",
   "related jobs", "similar jobs"
+];
+
+// ─── JOB SEEKER / FOR-HIRE / FORUM DISCUSSION MARKERS ───────────────────────
+const JOB_SEEKER_AND_FORUM_MARKERS = [
+  "[for hire]", "[forhire]", "[for-hire]", "[seeking]", "[hire me]", "[available]",
+  "[looking for work]", "[looking for job]", "looking for a job", "looking for job",
+  "looking for an internship", "looking for internship", "looking for work",
+  "seeking an internship", "seeking internship", "seeking entry level", "seeking sde",
+  "hire me as", "open to work", "open for work", "need a job", "need an internship",
+  "available for hire", "my resume", "resume review", "critique my resume",
+  "review my resume", "rant:", "discussion:", "query:", "question:", "how to get a job",
+  "how i got", "interview experience:", "should i join", "is it worth", "offer evaluation:",
+  "salary discussion", "help needed:", "career advice", "who is hiring?", "who wants to be hired"
 ];
 
 // ─── SENIORITY EXCLUSIONS (fresher/intern only) ──────────────────────────────
@@ -205,22 +229,39 @@ const FRESHER_BOOST_KEYWORDS = [
 // ─── FAKE / SCAM / UNPAID EXCLUSION MARKERS ────────────────────────────────
 const FAKE_AND_UNPAID_MARKERS = [
   // Unpaid / Zero stipend traps
-  "unpaid", "0 stipend", "zero stipend", "no stipend", "without stipend",
-  "free internship", "volunteer", "un-paid", "pay to learn", "registration fee",
-  "security deposit", "training fee", "buy course", "course fee", "commission only",
-  "100% commission", "pay per lead", "pay per sale", "unpaid internship",
-  "no salary", "performance based stipend only", "stipend: 0", "stipend: rs 0",
-  "stipend - 0", "stipend - rs 0", "stipend : 0", "stipend : rs. 0",
-  "stipend: nil", "stipend: null", "certificate only", "certificate of completion",
-  "experience letter only", "perks only", "lpa: 0",
+  "unpaid", "un-paid", "non-paid", "non paid", "un paid",
+  "0 stipend", "zero stipend", "no stipend", "without stipend", "free internship",
+  "volunteer", "no salary", "zero salary", "0 salary", "no pay", "zero pay", "without pay",
+  "stipend: 0", "stipend - 0", "stipend : 0", "stipend: rs 0", "stipend - rs 0", "stipend : rs 0",
+  "stipend: rs. 0", "stipend : rs. 0", "stipend: inr 0", "stipend : inr 0", "stipend: ₹0", "stipend : ₹0",
+  "stipend ₹ 0", "stipend: nil", "stipend: null", "stipend: none", "stipend: unpaid", "stipend - unpaid",
+  "stipend: na", "stipend: n/a", "stipend: not provided", "0 /month", "₹0/month", "inr 0/month",
+  "performance based stipend only", "stipend: performance based", "stipend: performance-based",
+  "commission only", "100% commission", "incentive only", "incentives only", "incentive based only",
+  "pay per lead", "pay per sale", "unpaid internship", "ta/da only", "travel allowance only",
+  "expenses only", "reimbursement only",
+
+  // Experience Letter / Certificate only traps
+  "certificate only", "certificate of completion only", "certificate + lor only",
+  "lor only", "letter of recommendation only", "experience letter only", "experience certificate only",
+  "perks only", "lpa: 0",
+
+  // Pay-to-work / Course fees / Registration fees
+  "pay to learn", "registration fee", "registration charges", "security deposit",
+  "training fee", "training charges", "training and placement", "training cum placement",
+  "buy course", "course fee", "course with internship", "course + internship", "pay after placement",
+  "income share agreement", "isa of", "interview fee", "interview charges", "placement charges",
+  "placement fee", "laptop deposit", "laptop charges", "refundable deposit", "processing fee",
+  "documentation fee", "documentation charges", "pay us",
 
   // Scam / Data Entry / Typing / Copy-Paste fraud / Telecalling
   "data entry", "form filling", "copy paste", "sms sending", "typing job",
-  "online typing", "captcha typing", "survey taker", "earn money online",
+  "online typing", "captcha typing", "captcha solving", "survey taker", "earn money online",
   "work from home without investment", "part time typing", "packet packing",
   "handwriting job", "offline data entry", "part-time data entry",
   "telecaller", "telecalling", "tele-caller", "telemarketing", "bpo", "kpo",
-  "back office", "voice process", "chat support",
+  "back office", "voice process", "chat support", "ad posting", "video watching",
+  "social media liking", "review rating job",
 
   // Multi-Level Marketing (MLM) & Pyramid Schemes
   "network marketing", "herbalife", "amway", "forever living", "pyramid scheme",
@@ -229,13 +270,14 @@ const FAKE_AND_UNPAID_MARKERS = [
   // Contact via Telegram / WhatsApp recruitment scams
   "whatsapp us on", "contact on whatsapp", "send resume on whatsapp",
   "apply via whatsapp", "telegram channel", "t.me/", "msg on telegram",
-  "call hr at", "contact hr on whatsapp", "whatsapp your cv",
+  "call hr at", "contact hr on whatsapp", "whatsapp your cv", "whatsapp your resume",
+  "send cv on whatsapp", "share resume on whatsapp", "wa.me/", "dm on telegram",
+  "contact on telegram", "join telegram",
 
   // Fraudulent / Too-good-to-be-true promises
-  "urgent hiring for freshers", "earn up to 50k", "daily payout",
-  "no interview direct joining", "direct joining", "instant hiring without interview",
-  "guaranteed job", "job guarantee fee", "pay us", "training charges",
-  "pay for laptop", "refundable deposit", "processing fee", "documentation charges"
+  "urgent hiring for freshers", "earn up to 50k", "daily payout", "daily earning", "earn daily",
+  "earn 1000-2000", "no interview direct joining", "direct joining", "instant hiring without interview",
+  "guaranteed job", "job guarantee fee", "100% placement guarantee program", "spot offer letter"
 ];
 
 // ─── DELHI-NCR REGION MARKERS (high priority on-site/hybrid location) ────────
@@ -245,7 +287,7 @@ export const DELHI_NCR_MARKERS = [
 ];
 
 /**
- * Detect fake, scam, unpaid, pay-to-work, or fraudulent job listings
+ * Detect fake, scam, unpaid, pay-to-work, forum discussion, or fraudulent job listings
  */
 export function isFakeJob(job) {
   const titleLower = (job.title || "").toLowerCase();
@@ -258,13 +300,22 @@ export function isFakeJob(job) {
     return true;
   }
 
-  // 2. Suspicious company names or placeholder companies
-  const suspiciousCompanies = ["hiring team", "hr department", "job provider", "unknown", "test company", "lorem ipsum"];
-  if (suspiciousCompanies.some(sc => companyLower === sc)) {
+  // 2. Check for job seeker / forum discussion posts
+  if (JOB_SEEKER_AND_FORUM_MARKERS.some(marker => titleLower.includes(marker) || descLower.substring(0, 120).includes(marker))) {
     return true;
   }
 
-  // 3. Repeated junk phrases or missing real title
+  // 3. Suspicious company names or aggregator placeholders
+  const suspiciousCompanies = [
+    "hiring team", "hr department", "job provider", "unknown", "test company",
+    "lorem ipsum", "shine employer", "timesjobs employer", "foundit employer",
+    "wellfound startup", "dev.to post", "placement services", "consultancy"
+  ];
+  if (suspiciousCompanies.some(sc => companyLower === sc || companyLower.startsWith(sc))) {
+    return true;
+  }
+
+  // 4. Repeated junk phrases or missing real title
   if (/lorem ipsum|sample text|test title/i.test(textLower)) {
     return true;
   }
@@ -318,9 +369,14 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 0c. Exclude blog post articles, listicles, or roundups (e.g. "8 Remote SWE Jobs...", "These Companies Want Interns...")
+  // 0c. Exclude blog post articles, listicles, or roundups
   const listicleRegex = /\b\d+\s+(?:[a-z0-9\-]+\s+){0,3}(?:jobs|internships|roles|opportunities|companies|sites|places|openings)\b|\btop\s+\d+\b|\bhow to (?:get|find|land|apply|ace|pass|prepare)\b|\bguide to\b|\bbest (?:websites|platforms|places|repos|repositories|tools) (?:to|for)\b|\b(?:job|jobs|hiring|internship|internships)\s+(?:roundup|round-up|round up|list|bulletin)\b|\blist of (?:remote|tech|software|internship|fresher)\b|\byou can apply to\b|\bthese companies want\b|\bcompanies (?:want|hiring|that hire)\b|\bactive opportunities\b/i;
   if (listicleRegex.test(titleLower)) {
+    return false;
+  }
+
+  // 0d. Exclude Job Seekers / [FOR HIRE] / Forum Discussions
+  if (JOB_SEEKER_AND_FORUM_MARKERS.some(marker => titleLower.includes(marker) || (job.description || "").substring(0, 100).toLowerCase().includes(marker))) {
     return false;
   }
 
@@ -334,18 +390,19 @@ export function matchesKeywords(job) {
     return false;
   }
 
-  // 3. Exclude Unwanted Fields (Sales, Marketing, DevOps, Data Analytics, SysAdmin, Support, QA, Non-Tech)
+  // 3. Exclude Unwanted Fields (Sales, Marketing, DevOps, Data Analytics, SysAdmin, Support, QA, Non-Software Engineering)
   const companyLower = (job.company || "").toLowerCase();
   if (UNWANTED_FIELD_EXCLUSIONS.some(e => titleLower.includes(e) || companyLower.includes(e))) {
     return false;
   }
 
-  // Also check if description begins or is predominantly sales/telecalling
+  // Also check if description begins or is predominantly sales/telecalling/non-tech
   const descLower = (job.description || "").toLowerCase();
   const salesDescIndicators = [
     "cold calling", "lead generation", "sales target", "sales targets",
     "outbound calls", "inbound calls", "telecalling", "telesales", "bpo process",
-    "field sales", "door to door", "selling products", "selling services"
+    "field sales", "door to door", "selling products", "selling services",
+    "electrical drawings", "substations and infrastructure", "revit, autocad"
   ];
   if (salesDescIndicators.some(s => descLower.includes(s))) {
     return false;
@@ -442,7 +499,7 @@ export function isGhostListing(job) {
 }
 
 /**
- * Validate that the job has a real, specific application URL (not generic category, homepage, or placeholder)
+ * Validate that the job has a real, specific application URL (not generic search, category landing, homepage, or placeholder)
  */
 export function isValidJobUrl(job) {
   if (!job.link || typeof job.link !== "string") return false;
@@ -452,19 +509,35 @@ export function isValidJobUrl(job) {
   // Reject placeholder & test links
   if (/example\.com|localhost|127\.0\.0\.1|placeholder/i.test(link)) return false;
 
-  // Reject generic search/category landing pages with no specific job post
-  const genericRoots = [
-    /^https?:\/\/(www\.)?internshala\.com\/internships\/?$/i,
-    /^https?:\/\/(www\.)?unstop\.com\/internships\/?$/i,
-    /^https?:\/\/(www\.)?unstop\.com\/jobs\/?$/i,
-    /^https?:\/\/(www\.)?wellfound\.com\/jobs\/?$/i,
-    /^https?:\/\/(www\.)?freshersworld\.com\/jobs\/category\/?/i,
-    /^https?:\/\/(www\.)?foundit\.in\/srp\/?/i,
-    /^https?:\/\/(www\.)?shine\.com\/job-search\/?/i,
-    /^https?:\/\/(www\.)?timesjobs\.com\/candidate\/?/i,
+  // Reject generic search/category landing pages with no specific individual job post
+  const genericSearchPatterns = [
+    /^https?:\/\/(?:www\.)?internshala\.com\/internships\/?(?:\?.*)?$/i,
+    /^https?:\/\/(?:www\.)?internshala\.com\/jobs\/?(?:\?.*)?$/i,
+    /^https?:\/\/(?:www\.)?unstop\.com\/internships\/?(?:\?.*)?$/i,
+    /^https?:\/\/(?:www\.)?unstop\.com\/jobs\/?(?:\?.*)?$/i,
+    /^https?:\/\/(?:www\.)?wellfound\.com\/jobs\/?(?:\?.*)?$/i,
+    /^https?:\/\/(?:www\.)?wellfound\.com\/(?:role|location)\/.*$/i,
+    /^https?:\/\/(?:www\.)?freshersworld\.com\/jobs\/category(?:\/.*)?$/i,
+    /^https?:\/\/(?:www\.)?foundit\.in\/srp\/.*$/i,
+    /^https?:\/\/(?:www\.)?shine\.com\/job-search\/.*$/i,
+    /^https?:\/\/(?:www\.)?timesjobs\.com\/candidate\/.*$/i,
+    /^https?:\/\/(?:www\.)?google\.com\/about\/careers\/applications\/jobs\/results.*$/i,
+    /^https?:\/\/(?:www\.)?linkedin\.com\/jobs\/search.*$/i,
+    /^https?:\/\/(?:www\.)?naukri\.com\/.*-(?:jobs|careers)(?:\?.*)?$/i,
+    /^https?:\/\/dev\.to\/listings\/cfp\/?.*$/i,
   ];
 
-  if (genericRoots.some(regex => regex.test(link))) {
+  if (genericSearchPatterns.some(regex => regex.test(link))) {
+    return false;
+  }
+
+  // Reject bare root URLs (e.g. "https://wellfound.com", "https://shine.com/")
+  try {
+    const parsed = new URL(link);
+    if (parsed.pathname === "/" || parsed.pathname === "") {
+      return false;
+    }
+  } catch {
     return false;
   }
 
@@ -505,7 +578,6 @@ export function filterJobs(jobs) {
     return true;
   });
 
-  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Invalid URLs: ${stats.invalidUrls} | 🚫 Fake/Unpaid: ${stats.fakeJobs} | Not-Target-Tech/Senior/DevOps/DataAnalyst: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
+  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Invalid URLs: ${stats.invalidUrls} | 🚫 Fake/Unpaid/Seeker: ${stats.fakeJobs} | Not-Target-Tech/Senior/Non-Software: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }
-

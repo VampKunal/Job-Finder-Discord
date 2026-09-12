@@ -8,10 +8,9 @@ import crypto from "crypto";
 
 export async function fetchHNHiringJobs() {
   try {
-    // Search for recent "Who is hiring" and "Who wants to be hired" story comments
+    // Only search official "Ask HN: Who is hiring?" author comments
     const queries = [
-      "https://hn.algolia.com/api/v1/search?query=&tags=comment,ask_hn&filters=author:whoishiring&hitsPerPage=200",
-      "https://hn.algolia.com/api/v1/search_by_date?query=hiring+intern+remote&tags=comment&hitsPerPage=100"
+      "https://hn.algolia.com/api/v1/search?query=&tags=comment,ask_hn&filters=author:whoishiring&hitsPerPage=150"
     ];
 
     const jobs = [];
@@ -31,6 +30,15 @@ export async function fetchHNHiringJobs() {
           const text = hit.comment_text || "";
           if (text.length < 100) continue;
 
+          // Reject candidates seeking work
+          const textLower = text.toLowerCase();
+          if (
+            textLower.includes("seeking work") || textLower.includes("seeking freelancer") ||
+            textLower.includes("looking for work") || textLower.includes("looking for a job")
+          ) {
+            continue;
+          }
+
           // HN hiring comments usually start with "Company Name | Role | Location | ..."
           const cleanText = text.replace(/<[^>]*>?/gm, " ").replace(/&[a-z]+;/gi, " ").trim();
           const firstLine = cleanText.split("\n")[0].trim();
@@ -41,6 +49,11 @@ export async function fetchHNHiringJobs() {
           const company = parts[0].substring(0, 80) || "HN Startup";
           const title = parts[1].substring(0, 120) || "Software Role";
           const location = parts[2] || "Remote";
+
+          // Skip if company or title indicates seeker
+          if (/seeking|looking for work|hire me/i.test(company) || /seeking|looking for work|hire me/i.test(title)) {
+            continue;
+          }
 
           const stableKey = `${company}_${title}`.toLowerCase().replace(/[^a-z0-9]/g, "");
           if (seen.has(stableKey)) continue;
