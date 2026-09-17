@@ -81,35 +81,50 @@ async function getCollection() {
 }
 
 /**
- * Normalize company name by stripping legal suffixes and standardizing
+ * Normalize company name by stripping legal suffixes, regional designations, and standardizing
  */
 export function normalizeCompany(rawCompany) {
   if (!rawCompany || typeof rawCompany !== "string") return "";
   let comp = rawCompany.toLowerCase().trim();
 
-  // Strip common corporate and regional suffixes
-  comp = comp.replace(/\b(private limited|pvt\.?\s*ltd\.?|ltd\.?|limited|inc\.?|llp|corp\.?|corporation)\b/gi, "");
-  comp = comp.replace(/\b(technologies|technology|tech|solutions|services|software|consulting|consultancy|labs|lab|india)\b/gi, "");
+  // Strip common corporate, recruiter, and regional suffixes
+  comp = comp.replace(/\b(private limited|pvt\.?\s*ltd\.?|ltd\.?|limited|inc\.?|llp|corp\.?|corporation|co\.?)\b/gi, "");
+  comp = comp.replace(/\b(technologies|technology|tech|solutions|services|software|consulting|consultancy|labs|lab|systems|workforce|group|global|india)\b/gi, "");
   comp = comp.replace(/[^a-z0-9]/g, "");
-  return comp;
+  return comp || rawCompany.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 15);
 }
 
 /**
- * Normalize job title by stripping noise words, brackets, batch years, and standardizing synonyms
+ * Normalize job title by extracting the primary role before pipe/delimiter tags,
+ * stripping noise words, brackets, batch years, locations, and standardizing synonyms
  */
 export function normalizeTitle(rawTitle) {
   if (!rawTitle || typeof rawTitle !== "string") return "";
   let title = rawTitle.toLowerCase().trim();
 
-  // Remove bracketed or parenthetical tags like (Fresher), [2025 Batch], (Gurugram), (WFH)
+  // 1. If title uses pipe or bullet delimiters (e.g. "Role | Entry Level | Fresher | Skills..."),
+  // isolate the primary role component
+  if (title.includes("|")) {
+    const parts = title.split("|").map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0 && parts[0].length >= 3) {
+      title = parts[0];
+    }
+  } else if (title.includes(" - ") || title.includes(" — ") || title.includes(" – ")) {
+    const parts = title.split(/\s+[-—–]\s+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length > 0 && parts[0].length >= 3) {
+      title = parts[0];
+    }
+  }
+
+  // 2. Remove bracketed or parenthetical tags like (Fresher), [2025 Batch], (Gurugram), (WFH)
   title = title.replace(/\((?:[^)]+)\)/g, " ");
   title = title.replace(/\[(?:[^\]]+)\]/g, " ");
 
-  // Strip noise words
-  title = title.replace(/\b(fresher|freshers|immediate joiner|urgent|hiring|batch|year|months?|off-campus|walk-in)\b/gi, "");
+  // 3. Strip noise words and location/workplace tags
+  title = title.replace(/\b(fresher|freshers|immediate joiner|immediate|urgent|hiring|batch|year|months?|off-campus|walk-in|entry-level|entry level|remote|wfh|work from home|india|hybrid|full-time|part-time)\b/gi, "");
   title = title.replace(/\b(?:202[3-9]|203[0-5])\b/g, ""); // strip years like 2024, 2025, 2026
 
-  // Standardize common tech job titles
+  // 4. Standardize common tech job titles
   title = title.replace(/\b(software development engineer|software developer|software engineer|swe)\b/gi, "sde");
   title = title.replace(/\b(front[\s-]*end|ui developer|ui engineer)\b/gi, "frontend");
   title = title.replace(/\b(back[\s-]*end)\b/gi, "backend");
@@ -121,15 +136,15 @@ export function normalizeTitle(rawTitle) {
 
   // Keep only alphanumeric
   title = title.replace(/[^a-z0-9]/g, "");
-  return title;
+  return title || rawTitle.toLowerCase().replace(/[^a-z0-9]/g, "").substring(0, 20);
 }
 
 /**
  * Generate stable Title + Company deduplication hash
  */
 export function getTitleCompanyKey(job) {
-  const comp = normalizeCompany(job.company || "");
-  const title = normalizeTitle(job.title || "");
+  const comp = normalizeCompany(job.company || "company");
+  const title = normalizeTitle(job.title || "title");
   const rawHash = crypto.createHash("md5").update(`${comp}_${title}`).digest("hex").substring(0, 16);
   return `tc_${rawHash}`;
 }

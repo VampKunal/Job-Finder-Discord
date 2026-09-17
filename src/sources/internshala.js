@@ -21,9 +21,9 @@ async function scrapePage(url, seen) {
     const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobBot/1.0",
-        "X-Return-Format": "text"
+        "X-Return-Format": "markdown"
       }
-    }, 8000);
+    }, 12000);
 
     if (!res.ok) return [];
 
@@ -35,21 +35,28 @@ async function scrapePage(url, seen) {
       const trimmed = line.trim();
 
       if ((trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("**")) && trimmed.length > 10) {
-        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 50) {
+        if (currentJob && currentJob.title && currentJob.link) {
           jobs.push(currentJob);
         }
+        currentJob = null;
 
         const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
         const titleClean = linkMatch
-          ? linkMatch[1].replace(/\*\*/g, "").trim()
+          ? linkMatch[1].replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim()
           : trimmed.replace(/^[#*]+\s*/, "").replace(/\*\*/g, "").replace(/\[|\]/g, "").trim();
 
-        if (titleClean.length < 5) continue;
+        if (titleClean.length < 4) continue;
 
         const directLink = linkMatch ? linkMatch[2].trim() : null;
         if (!directLink || !directLink.includes("/detail/")) {
-          currentJob = null;
           continue;
+        }
+
+        // Extract company from URL slug (e.g. "...-at-onelap-telematics-private-limited1789619931")
+        let company = "Internshala Employer";
+        const slugMatch = directLink.match(/-at-([a-z0-9-]+?)(?:\d{6,})?$/i);
+        if (slugMatch && slugMatch[1]) {
+          company = slugMatch[1].split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
         }
 
         const stableKey = `internshala_${titleClean}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -61,28 +68,28 @@ async function scrapePage(url, seen) {
         currentJob = {
           id: `internshala-${hash}`,
           title: titleClean.substring(0, 150),
-          company: "Internshala Employer",
+          company: company,
           link: directLink,
           location: "India / Work From Home",
-          description: "",
+          description: `${titleClean} opportunity at ${company}. Found via Internshala.`,
           date: new Date().toISOString(),
           source: "Internshala"
         };
-      } else if (currentJob && trimmed.length > 15) {
+      } else if (currentJob && trimmed.length > 10) {
         if (/^at\s|^company:\s|^employer:\s/i.test(trimmed)) {
           currentJob.company = trimmed.replace(/^(at|company:|employer:)\s*/i, "").trim();
         } else if (/stipend|duration|location|apply by/i.test(trimmed)) {
           currentJob.description += ` ${trimmed}`;
           if (/location/i.test(trimmed)) {
             const loc = trimmed.replace(/.*location\s*[:–-]?\s*/i, "").trim();
-            if (loc) currentJob.location = loc;
+            if (loc && loc.length < 50) currentJob.location = loc;
           }
-        } else {
+        } else if (trimmed.length > 20 && !trimmed.startsWith("![")) {
           currentJob.description += ` ${trimmed}`;
         }
       }
     }
-    if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 50) {
+    if (currentJob && currentJob.title && currentJob.link) {
       jobs.push(currentJob);
     }
   } catch (e) {

@@ -1,7 +1,5 @@
-/**
- * Freshersworld India IT Jobs Fetcher via Jina Reader
- */
 import crypto from "crypto";
+import { fetchWithTimeout } from "../tools/fetch.js";
 
 const FRESHERSWORLD_URL = "https://r.jina.ai/https://www.freshersworld.com/jobs/category/it-software-jobs";
 
@@ -10,9 +8,9 @@ export async function fetchFreshersworldJobs() {
   const seen = new Set();
 
   try {
-    const res = await fetch(FRESHERSWORLD_URL, {
-      headers: { "User-Agent": "Mozilla/5.0 JobBot/1.0", "X-Return-Format": "text" }
-    });
+    const res = await fetchWithTimeout(FRESHERSWORLD_URL, {
+      headers: { "User-Agent": "Mozilla/5.0 JobBot/1.0", "X-Return-Format": "markdown" }
+    }, 12000);
     if (!res.ok) return [];
     const text = await res.text();
     const lines = text.split("\n");

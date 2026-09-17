@@ -280,6 +280,27 @@ const FAKE_AND_UNPAID_MARKERS = [
   "guaranteed job", "job guarantee fee", "100% placement guarantee program", "spot offer letter"
 ];
 
+// ─── FAKE, SCAM, CERTIFICATE MILL, & MULTI-POSTING SPAM COMPANIES ────────────
+const FAKE_AND_SPAM_COMPANIES = [
+  // High-frequency LinkedIn programmatic fake employers / scrapers
+  "crossing infotech", "medinex workforce", "unified mentor", "vortenza systems",
+  "devryxa", "appversal", "lexsi labs", "jobgether",
+
+  // Notorious task-based unpaid certificate / fee traps
+  "oasis infobyte", "bharat intern", "octanet", "shadowfox", "technohacks",
+  "codealpha", "codsoft", "cognifyz", "sync interns", "nullclass", "innobyte",
+  "teachnook", "cipherschools", "vaultofcodes", "the sparks foundation", "letsgrowmore",
+  "lgmvip", "suven consultants", "verzeo", "techvolt", "brainwave matrix",
+  "skilldzire", "codeclause", "internpe", "nexus info", "motioncut", "apexplanet",
+  "edufabric", "growintern", "prodigy infotech", "learnx", "codequotient",
+
+  // Generic fake / placeholder / dubious consultancy names
+  "hiring team", "hr department", "job provider", "unknown", "test company",
+  "lorem ipsum", "shine employer", "timesjobs employer", "foundit employer",
+  "wellfound startup", "dev.to post", "placement services", "consultancy services",
+  "placement cell", "hr consultancy", "seven consultancy", "skywings advisors"
+];
+
 // ─── DELHI-NCR REGION MARKERS (high priority on-site/hybrid location) ────────
 export const DELHI_NCR_MARKERS = [
   "noida", "gurgaon", "gurugram", "delhi", "new delhi",
@@ -305,17 +326,17 @@ export function isFakeJob(job) {
     return true;
   }
 
-  // 3. Suspicious company names or aggregator placeholders
-  const suspiciousCompanies = [
-    "hiring team", "hr department", "job provider", "unknown", "test company",
-    "lorem ipsum", "shine employer", "timesjobs employer", "foundit employer",
-    "wellfound startup", "dev.to post", "placement services", "consultancy"
-  ];
-  if (suspiciousCompanies.some(sc => companyLower === sc || companyLower.startsWith(sc))) {
+  // 3. Known fake / scam / spam companies or aggregators
+  if (FAKE_AND_SPAM_COMPANIES.some(fc => companyLower.includes(fc) || textLower.includes(fc))) {
     return true;
   }
 
-  // 4. Repeated junk phrases or missing real title
+  // 4. Programmatic multi-pipe keyword stuffing template (e.g. "Role | Entry Level | Fresher | Skills... | Remote")
+  if (/\|\s*(?:entry level|fresher)\s*\|/i.test(job.title) || /\|\s*fresher\s*\|\s*remote/i.test(job.title)) {
+    return true;
+  }
+
+  // 5. Repeated junk phrases or missing real title
   if (/lorem ipsum|sample text|test title/i.test(textLower)) {
     return true;
   }

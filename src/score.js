@@ -128,7 +128,7 @@ function sanitizeBestMatch(bestMatchRaw, profiles) {
 
   for (const p of profiles) {
     const firstName = p.name.split(" ")[0].toLowerCase();
-    if (lower.includes("firstName")) {
+    if (lower.includes(firstName) || lower.includes(p.name.toLowerCase())) {
       return p.name;
     }
   }

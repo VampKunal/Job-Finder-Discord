@@ -1,79 +1,82 @@
 /**
- * Unstop (formerly D2C) Opportunities Fetcher (Optimized)
- * Extracts direct opportunity links from markdown
+ * Unstop Opportunities Fetcher (Direct Public JSON API)
+ * Directly queries Unstop's public API for fresh internships & jobs
  */
 
 import crypto from "crypto";
 import { fetchWithTimeout } from "../tools/fetch.js";
 
-const UNSTOP_PAGES = [
-  "https://r.jina.ai/https://unstop.com/internships?oppstatus=recent&searchTerm=software",
-  "https://r.jina.ai/https://unstop.com/internships?oppstatus=recent&searchTerm=web+developer",
-  "https://r.jina.ai/https://unstop.com/jobs?oppstatus=recent&searchTerm=fresher+software"
+const UNSTOP_ENDPOINTS = [
+  { url: "https://unstop.com/api/public/opportunity/search-result?opportunity=internships&per_page=25&searchTerm=software", type: "Internship" },
+  { url: "https://unstop.com/api/public/opportunity/search-result?opportunity=internships&per_page=25&searchTerm=web+developer", type: "Internship" },
+  { url: "https://unstop.com/api/public/opportunity/search-result?opportunity=internships&per_page=25&searchTerm=python", type: "Internship" },
+  { url: "https://unstop.com/api/public/opportunity/search-result?opportunity=jobs&per_page=25&searchTerm=fresher+software", type: "Job" },
+  { url: "https://unstop.com/api/public/opportunity/search-result?opportunity=jobs&per_page=25&searchTerm=web+developer", type: "Job" },
 ];
 
-async function scrapePage(url, seen) {
+async function fetchUnstopEndpoint(endpoint, seen) {
   const jobs = [];
   try {
-    const res = await fetchWithTimeout(url, {
+    const res = await fetchWithTimeout(endpoint.url, {
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobBot/1.0",
-        "X-Return-Format": "text"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
       }
     }, 8000);
 
     if (!res.ok) return [];
 
-    const text = await res.text();
-    const lines = text.split("\n");
-    let currentJob = null;
+    const json = await res.json();
+    const items = json.data?.data || json.data || [];
 
-    for (const line of lines) {
-      const trimmed = line.trim();
+    if (!Array.isArray(items)) return [];
 
-      if ((trimmed.startsWith("### ") || trimmed.startsWith("## ")) && trimmed.length > 10) {
-        if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
-          jobs.push(currentJob);
-        }
+    for (const item of items) {
+      const title = (item.title || "").trim();
+      if (!title || title.length < 4) continue;
 
-        const linkMatch = trimmed.match(/\[(.*?)\]\((https?:\/\/[^\s)]+)\)/);
-        const titleClean = linkMatch
-          ? linkMatch[1].trim()
-          : trimmed.replace(/^[#]+\s*/, "").replace(/\[|\]/g, "").trim();
+      const rawLink = item.public_url || item.seo_url || "";
+      const link = rawLink.startsWith("http")
+        ? rawLink
+        : `https://unstop.com/${rawLink.replace(/^\/+/, "")}`;
 
-        if (titleClean.length < 5) continue;
+      if (!link || link === "https://unstop.com/") continue;
 
-        const directLink = linkMatch ? linkMatch[2].trim() : null;
-        if (!directLink || (!directLink.includes("/internships/") && !directLink.includes("/jobs/") && !directLink.includes("/competitions/"))) {
-          currentJob = null;
-          continue;
-        }
+      const company = item.organisation?.name || item.reg_types?.name || "Unstop Employer";
+      const stableKey = `unstop_${title}_${company}_${item.id || link}`.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-        const stableKey = `unstop_${titleClean}_${directLink}`.toLowerCase().replace(/[^a-z0-9]/g, "");
-        if (seen.has(stableKey)) continue;
-        seen.add(stableKey);
+      if (seen.has(stableKey)) continue;
+      seen.add(stableKey);
 
-        const hash = crypto.createHash("md5").update(stableKey).digest("hex").substring(0, 12);
+      const hash = crypto.createHash("md5").update(stableKey).digest("hex").substring(0, 12);
 
-        currentJob = {
-          id: `unstop-${hash}`,
-          title: titleClean.substring(0, 150),
-          company: "Unstop Employer",
-          link: directLink,
-          location: "India",
-          description: "",
-          date: new Date().toISOString(),
-          source: "Unstop"
-        };
-      } else if (currentJob && trimmed.length > 15) {
-        currentJob.description += ` ${trimmed}`;
-      }
+      // Build description from job details / eligible criteria
+      const descParts = [
+        item.job_detail?.about || "",
+        item.job_detail?.responsibilities || "",
+        item.job_detail?.requirements || "",
+        item.eligibility || ""
+      ].filter(Boolean);
+
+      const description = descParts.length > 0
+        ? descParts.join("\n\n").replace(/<[^>]*>?/gm, "").substring(0, 1200)
+        : `${title} at ${company}. Type: ${endpoint.type}. Found via Unstop.`;
+
+      const location = item.job_detail?.locations?.[0] || item.location || "India";
+
+      jobs.push({
+        id: `unstop-${hash}`,
+        title: title,
+        company: company,
+        link: link,
+        location: location,
+        description: description,
+        date: item.start_date ? new Date(item.start_date).toISOString() : new Date().toISOString(),
+        source: "Unstop"
+      });
     }
-    if (currentJob && currentJob.title && currentJob.link && currentJob.description.length > 30) {
-      jobs.push(currentJob);
-    }
-  } catch (e) {
-    console.warn(`[Unstop] Jina fetch failed: ${e.message}`);
+  } catch (err) {
+    console.warn(`[Unstop API] Failed to fetch ${endpoint.url}: ${err.message}`);
   }
 
   return jobs;
@@ -81,7 +84,7 @@ async function scrapePage(url, seen) {
 
 export async function fetchUnstopJobs() {
   const seen = new Set();
-  const results = await Promise.allSettled(UNSTOP_PAGES.map(url => scrapePage(url, seen)));
+  const results = await Promise.allSettled(UNSTOP_ENDPOINTS.map(ep => fetchUnstopEndpoint(ep, seen)));
   const jobs = [];
 
   for (const res of results) {
@@ -90,5 +93,5 @@ export async function fetchUnstopJobs() {
     }
   }
 
-  return jobs.slice(0, 40);
+  return jobs.slice(0, 50);
 }

@@ -20,9 +20,9 @@ async function scrapeJinaPage(url, source, location) {
     const res = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) JobBot/1.0",
-        "X-Return-Format": "text"
+        "X-Return-Format": "markdown"
       }
-    }, 8000);
+    }, 12000);
 
     if (!res.ok) return [];
 
