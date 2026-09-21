@@ -15,8 +15,6 @@ import { fetchWellfoundJobs } from "./sources/wellfound.js";
 import { fetchHNHiringJobs } from "./sources/hn_hiring.js";
 import { fetchRedditJobs } from "./sources/reddit_jobs.js";
 import { fetchIndeedRSSJobs } from "./sources/indeed_rss.js";
-import { fetchInternshalaJobs } from "./sources/internshala.js";
-import { fetchUnstopJobs } from "./sources/unstop.js";
 import { fetchDevToJobs } from "./sources/devto_jobs.js";
 import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
@@ -26,24 +24,22 @@ import { runPipeline } from "./pipeline.js";
 
 // Configurable intervals via environment variables (in minutes)
 const FAST_POLL_INTERVAL_MIN = parseInt(process.env.FAST_POLL_INTERVAL_MIN || "3", 10);
-const DEEP_SCRAPE_INTERVAL_MIN = parseInt(process.env.DEEP_SCRAPE_INTERVAL_MIN || "60", 10);
+const DEEP_SCRAPE_INTERVAL_MIN = parseInt(process.env.DEEP_SCRAPE_INTERVAL_MIN || "15", 10);
 
-// ── FAST INSTANT SOURCES (Lightweight Indian APIs, RSS & Target ATS) ─────
+// ── FAST INSTANT & PRIORITY SOURCES (Career Pages, LinkedIn & Direct APIs — runs every ~3 mins) ─────
 const fastSources = [
-  { name: "ATS Direct (Greenhouse & Lever Target Companies)", fn: fetchATSJobs },
+  { name: "ATS Direct (Greenhouse & Lever Career Pages)", fn: fetchATSJobs },
+  { name: "LinkedIn India (Fast Search)", fn: fetchLinkedInJobs },
+  { name: "InternDoor Internships (Direct JSON)", fn: fetchInternDoorJobs },
   { name: "Indeed India RSS", fn: fetchIndeedRSSJobs },
+  { name: "Naukri RSS", fn: fetchNaukriJobs },
   { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
   { name: "Dev.to Jobs API", fn: fetchDevToJobs },
   { name: "HN Who's Hiring API", fn: fetchHNHiringJobs },
 ];
 
-// ── DEEP SCRAPING SOURCES (Heavy Indian Scrapers & Aggregators) ───────────
+// ── DEEP SCRAPING SOURCES (Heavy Indian Aggregators & Social Feeds — runs every ~15 mins) ───────────
 const deepSources = [
-  { name: "LinkedIn India", fn: fetchLinkedInJobs },
-  { name: "Internshala Scraper", fn: fetchInternshalaJobs },
-  { name: "InternDoor Internships", fn: fetchInternDoorJobs },
-  { name: "Unstop Scraper", fn: fetchUnstopJobs },
-  { name: "Naukri RSS & Aggregator", fn: fetchNaukriJobs },
   { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
   { name: "Wellfound India (AngelList)", fn: fetchWellfoundJobs },
   { name: "Freshersworld India", fn: fetchFreshersworldJobs },

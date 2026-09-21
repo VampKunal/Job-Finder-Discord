@@ -10,8 +10,6 @@ import { fetchWellfoundJobs } from "./sources/wellfound.js";
 import { fetchHNHiringJobs } from "./sources/hn_hiring.js";
 import { fetchRedditJobs } from "./sources/reddit_jobs.js";
 import { fetchIndeedRSSJobs } from "./sources/indeed_rss.js";
-import { fetchInternshalaJobs } from "./sources/internshala.js";
-import { fetchUnstopJobs } from "./sources/unstop.js";
 import { fetchDevToJobs } from "./sources/devto_jobs.js";
 import { fetchFreshersworldJobs } from "./sources/freshersworld.js";
 import { fetchNaukriJobs } from "./sources/naukri.js";
@@ -27,15 +25,13 @@ async function main() {
 
   const allFetchers = [
     { name: "LinkedIn India", fn: fetchLinkedInJobs },
+    { name: "ATS Direct (Greenhouse/Lever Career Pages)", fn: fetchATSJobs },
     { name: "Indeed India RSS", fn: fetchIndeedRSSJobs },
-    { name: "Internshala", fn: fetchInternshalaJobs },
-    { name: "Unstop", fn: fetchUnstopJobs },
     { name: "Naukri RSS", fn: fetchNaukriJobs },
     { name: "InternDoor Internships", fn: fetchInternDoorJobs },
     { name: "India Aggregators (Shine/TimesJobs/Google)", fn: fetchIndiaAggregatorJobs },
     { name: "Wellfound India", fn: fetchWellfoundJobs },
     { name: "Freshersworld India", fn: fetchFreshersworldJobs },
-    { name: "ATS Direct (Greenhouse/Lever)", fn: fetchATSJobs },
     { name: "HN Who's Hiring (India/Remote)", fn: fetchHNHiringJobs },
     { name: "Reddit Jobs (India/Remote)", fn: fetchRedditJobs },
     { name: "Dev.to Jobs", fn: fetchDevToJobs },

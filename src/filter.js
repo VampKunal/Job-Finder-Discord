@@ -15,7 +15,7 @@
 
 // ─── INDIA-SPECIFIC SOURCES (trusted Indian platforms) ──────────────────────
 const INDIA_SOURCES = [
-  "internshala", "unstop", "freshersworld", "naukri", "indeed india"
+  "freshersworld", "naukri", "indeed india"
 ];
 
 // ─── INDIAN CITIES & TECH HUBS ───────────────────────────────────────────────
@@ -283,7 +283,7 @@ const FAKE_AND_UNPAID_MARKERS = [
 // ─── FAKE, SCAM, CERTIFICATE MILL, & MULTI-POSTING SPAM COMPANIES ────────────
 const FAKE_AND_SPAM_COMPANIES = [
   // High-frequency LinkedIn programmatic fake employers / scrapers
-  "crossing infotech", "medinex workforce", "unified mentor", "vortenza systems",
+  "zenithbyte", "um it", "um it solutions", "umit", "crossing infotech", "medinex workforce", "unified mentor", "vortenza systems",
   "devryxa", "appversal", "lexsi labs", "jobgether",
 
   // Notorious task-based unpaid certificate / fee traps
@@ -315,6 +315,14 @@ export function isFakeJob(job) {
   const descLower = (job.description || "").toLowerCase();
   const companyLower = (job.company || "").toLowerCase();
   const textLower = `${titleLower} ${descLower} ${companyLower}`;
+
+  // 0. Explicit unpaid flags
+  if (job.isPaid === false || job.paid_unpaid === "unpaid" || job.paid === false) {
+    return true;
+  }
+  if (job.stipend && (/(?:^|\b)(?:unpaid|0\s*\/|₹0|rs\.?\s*0|nil|none|free)(?:\b|$)/i.test(job.stipend))) {
+    return true;
+  }
 
   // 1. Check for fake / scam / unpaid keywords
   if (FAKE_AND_UNPAID_MARKERS.some(marker => textLower.includes(marker))) {
@@ -532,10 +540,6 @@ export function isValidJobUrl(job) {
 
   // Reject generic search/category landing pages with no specific individual job post
   const genericSearchPatterns = [
-    /^https?:\/\/(?:www\.)?internshala\.com\/internships\/?(?:\?.*)?$/i,
-    /^https?:\/\/(?:www\.)?internshala\.com\/jobs\/?(?:\?.*)?$/i,
-    /^https?:\/\/(?:www\.)?unstop\.com\/internships\/?(?:\?.*)?$/i,
-    /^https?:\/\/(?:www\.)?unstop\.com\/jobs\/?(?:\?.*)?$/i,
     /^https?:\/\/(?:www\.)?wellfound\.com\/jobs\/?(?:\?.*)?$/i,
     /^https?:\/\/(?:www\.)?wellfound\.com\/(?:role|location)\/.*$/i,
     /^https?:\/\/(?:www\.)?freshersworld\.com\/jobs\/category(?:\/.*)?$/i,
@@ -566,10 +570,12 @@ export function isValidJobUrl(job) {
 }
 
 /**
- * Master filter: ghost check + fake/unpaid check + url check + keyword + location
+ * Master filter: ghost check + fake/unpaid check + url check + keyword + location + company frequency cap
  */
 export function filterJobs(jobs) {
-  const stats = { total: 0, ghosted: 0, fakeJobs: 0, invalidUrls: 0, notTech: 0, locationFail: 0, passed: 0 };
+  const stats = { total: 0, ghosted: 0, fakeJobs: 0, invalidUrls: 0, notTech: 0, locationFail: 0, multiPostingSpam: 0, passed: 0 };
+  const companyCounts = new Map();
+  const MAX_JOBS_PER_COMPANY_PER_RUN = 2; // Cap max jobs from same employer per scrape batch
 
   const result = jobs.filter(job => {
     stats.total++;
@@ -595,10 +601,21 @@ export function filterJobs(jobs) {
       return false;
     }
 
+    // High-Frequency Employer Anti-Spam Check
+    const normCompany = (job.company || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (normCompany && normCompany.length > 2) {
+      const count = (companyCounts.get(normCompany) || 0) + 1;
+      companyCounts.set(normCompany, count);
+      if (count > MAX_JOBS_PER_COMPANY_PER_RUN) {
+        stats.multiPostingSpam++;
+        return false;
+      }
+    }
+
     stats.passed++;
     return true;
   });
 
-  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Invalid URLs: ${stats.invalidUrls} | 🚫 Fake/Unpaid/Seeker: ${stats.fakeJobs} | Not-Target-Tech/Senior/Non-Software: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
+  console.log(`[Filter Stats] Total: ${stats.total} | Ghost: ${stats.ghosted} | Invalid URLs: ${stats.invalidUrls} | 🚫 Fake/Unpaid/Seeker: ${stats.fakeJobs} | 📢 Multi-Posting Spam: ${stats.multiPostingSpam} | Not-Target-Tech/Senior/Non-Software: ${stats.notTech} | Location-Fail: ${stats.locationFail} | ✅ Passed: ${stats.passed}`);
   return result;
 }

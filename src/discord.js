@@ -56,7 +56,7 @@ export async function pushToDiscord(job, scoreObj) {
   if (/noida|gurgaon|gurugram|delhi/i.test(locLower) || /noida|gurgaon|gurugram|delhi/i.test(job.title.toLowerCase())) {
     locationTag = "📍 Delhi-NCR";
   } else if (/india|bangalore|bengaluru|mumbai|hyderabad|pune|chennai|kolkata/i.test(locLower)
-    || ["internshala", "unstop", "freshersworld", "naukri", "indeed india"].some(s => sourceLower.includes(s))) {
+    || ["freshersworld", "naukri", "indeed india"].some(s => sourceLower.includes(s))) {
     locationTag = "🇮🇳 India";
   } else if (/worldwide|global|anywhere|remote/i.test(locLower)) {
     locationTag = "🌐 Remote";
@@ -87,6 +87,14 @@ export async function pushToDiscord(job, scoreObj) {
   }
 
   // Meta fields
+  if (job.stipend || job.salary) {
+    fields.push({
+      name: "💰 Stipend / Salary",
+      value: job.stipend || job.salary,
+      inline: true
+    });
+  }
+
   fields.push(
     { name: "📍 Location", value: job.location || "Remote", inline: true },
     { name: "🏷️ Source", value: job.source || "Web", inline: true },
@@ -104,11 +112,33 @@ export async function pushToDiscord(job, scoreObj) {
   };
 
   try {
-    const res = await fetch(webhookUrl, {
+    let res = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embeds: [embed] })
     });
+
+    // Discord rate limit fallback: handle 429 with retry_after backoff
+    if (res.status === 429) {
+      let retryAfterMs = 2000;
+      try {
+        const rateLimitData = await res.json();
+        if (rateLimitData.retry_after) {
+          retryAfterMs = Math.ceil(rateLimitData.retry_after * 1000) + 200;
+        }
+      } catch {
+        const headerSec = res.headers.get("Retry-After");
+        if (headerSec) retryAfterMs = Math.ceil(parseFloat(headerSec) * 1000) + 200;
+      }
+      console.warn(`[Discord Rate Limit] ⚠️ HTTP 429 received. Backing off for ${retryAfterMs}ms before retrying...`);
+      await sleep(retryAfterMs);
+
+      res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ embeds: [embed] })
+      });
+    }
 
     if (!res.ok) {
       console.error(`[Discord] Webhook push failed (HTTP ${res.status}): ${await res.text()}`);
