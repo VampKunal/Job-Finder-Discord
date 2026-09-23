@@ -25,7 +25,15 @@ export async function fetchLinkedInJobs() {
     { keywords: "software trainee", location: "India" },
     { keywords: "graduate engineer trainee", location: "India" },
     { keywords: "software intern", location: "Delhi NCR" },
-    { keywords: "software engineer entry level remote", location: "India" }
+    { keywords: "software engineer entry level remote", location: "India" },
+    { keywords: "software engineer fresher", location: "Noida" },
+    { keywords: "software intern", location: "Gurgaon" },
+    { keywords: "full stack developer", location: "Delhi" },
+    { keywords: "frontend developer", location: "Gurugram" },
+    { keywords: "backend developer", location: "Noida" },
+    { keywords: "react developer intern", location: "Delhi NCR" },
+    { keywords: "AI ML intern", location: "Gurgaon" },
+    { keywords: "SDE intern", location: "Noida" }
   ];
 
   const jobs = [];

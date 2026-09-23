@@ -78,5 +78,14 @@
   { "name": "Mindtickle", "greenhouse": "mindtickle" },
   { "name": "Yellow.ai", "greenhouse": "yellowai" },
   { "name": "Darwinbox", "greenhouse": "darwinbox" },
-  { "name": "Leadsquared", "greenhouse": "leadsquared" }
+  { "name": "Leadsquared", "greenhouse": "leadsquared" },
+  { "name": "Urban Company", "greenhouse": "urbancompany" },
+  { "name": "Blinkit", "greenhouse": "blinkit" },
+  { "name": "Shiprocket", "greenhouse": "shiprocket" },
+  { "name": "Spinny", "greenhouse": "spinny" },
+  { "name": "Pristyn Care", "greenhouse": "pristyncare" },
+  { "name": "Moglix", "greenhouse": "moglix" },
+  { "name": "CommerceIQ", "greenhouse": "commerceiq" },
+  { "name": "BharatPe", "greenhouse": "bharatpe" },
+  { "name": "Oyo", "greenhouse": "oyorooms" }
 ]

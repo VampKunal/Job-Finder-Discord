@@ -9,7 +9,10 @@ import { fetchWithTimeout } from "../tools/fetch.js";
 const INDIA_JOB_PAGES = [
   { url: "https://r.jina.ai/https://www.foundit.in/srp/results?searchType=personalised&query=software+intern&locations=india&experienceRanges=0~1", source: "Foundit India", location: "India" },
   { url: "https://r.jina.ai/https://www.shine.com/job-search/software-engineer-fresher-jobs", source: "Shine", location: "India" },
-  { url: "https://r.jina.ai/https://www.timesjobs.com/candidate/job-search.html?searchType=personalise&from=submit&searchTextSrc=&searchTextText=software+developer&txtKeywords=software+developer+fresher&txtLocation=india&cboWorkExp1=0", source: "TimesJobs", location: "India" }
+  { url: "https://r.jina.ai/https://www.timesjobs.com/candidate/job-search.html?searchType=personalise&from=submit&searchTextSrc=&searchTextText=software+developer&txtKeywords=software+developer+fresher&txtLocation=india&cboWorkExp1=0", source: "TimesJobs", location: "India" },
+  { url: "https://r.jina.ai/https://www.foundit.in/srp/results?searchType=personalised&query=software+intern&locations=noida,gurgaon,delhi&experienceRanges=0~1", source: "Foundit NCR", location: "Delhi NCR, India" },
+  { url: "https://r.jina.ai/https://www.shine.com/job-search/software-engineer-fresher-jobs-in-delhi-ncr", source: "Shine NCR", location: "Delhi NCR, India" },
+  { url: "https://r.jina.ai/https://www.timesjobs.com/candidate/job-search.html?searchType=personalise&from=submit&searchTextSrc=&searchTextText=software+developer&txtKeywords=software+developer+fresher&txtLocation=noida,gurgaon,delhi&cboWorkExp1=0", source: "TimesJobs NCR", location: "Delhi NCR, India" }
 ];
 
 async function scrapeJinaPage(url, source, location) {

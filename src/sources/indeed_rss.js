@@ -18,10 +18,15 @@ const INDEED_FEEDS = [
   { url: "https://in.indeed.com/rss?q=data+science+fresher&l=india&sort=date&limit=25", label: "India Data Science" },
   { url: "https://in.indeed.com/rss?q=java+developer+fresher&l=india&sort=date&limit=25", label: "India Java Fresher" },
   { url: "https://in.indeed.com/rss?q=backend+developer+intern&l=india&sort=date&limit=25", label: "India Backend Intern" },
-  { url: "https://in.indeed.com/rss?q=software+intern&l=bangalore&sort=date&limit=25", label: "Bangalore SWE Intern" },
-  { url: "https://in.indeed.com/rss?q=software+intern&l=hyderabad&sort=date&limit=25", label: "Hyderabad SWE Intern" },
-  { url: "https://in.indeed.com/rss?q=software+intern&l=pune&sort=date&limit=25", label: "Pune SWE Intern" },
-  { url: "https://in.indeed.com/rss?q=software+intern&l=delhi&sort=date&limit=25", label: "Delhi SWE Intern" }
+  { url: "https://in.indeed.com/rss?q=software+intern&l=bangalore&sort=date&limit=25", label: "Bangalore SWE Intern", location: "Bangalore, India" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=hyderabad&sort=date&limit=25", label: "Hyderabad SWE Intern", location: "Hyderabad, India" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=pune&sort=date&limit=25", label: "Pune SWE Intern", location: "Pune, India" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=delhi&sort=date&limit=25", label: "Delhi SWE Intern", location: "Delhi, India" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=noida&sort=date&limit=25", label: "Noida SWE Intern", location: "Noida, India" },
+  { url: "https://in.indeed.com/rss?q=software+intern&l=gurgaon&sort=date&limit=25", label: "Gurgaon SWE Intern", location: "Gurgaon, India" },
+  { url: "https://in.indeed.com/rss?q=software+engineer+fresher&l=noida&sort=date&limit=25", label: "Noida SWE Fresher", location: "Noida, India" },
+  { url: "https://in.indeed.com/rss?q=software+engineer+fresher&l=gurgaon&sort=date&limit=25", label: "Gurgaon SWE Fresher", location: "Gurgaon, India" },
+  { url: "https://in.indeed.com/rss?q=full+stack+developer&l=delhi+ncr&sort=date&limit=25", label: "Delhi NCR Full Stack", location: "Delhi NCR, India" }
 ];
 
 async function fetchFeed(feed, seen) {
@@ -47,7 +52,7 @@ async function fetchFeed(feed, seen) {
         title: title,
         company: item.source || item.author || "Indeed India Employer",
         link: link,
-        location: "India",
+        location: feed.location || "India",
         description: description.length > 50 ? description : `${title}. Found via Indeed India RSS (${feed.label}).`,
         date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
         source: `Indeed India (${feed.label})`

@@ -5,7 +5,10 @@ export async function fetchWellfoundJobs() {
   try {
     const targetUrls = [
       "https://r.jina.ai/https://wellfound.com/role/l/software-engineer/remote",
-      "https://r.jina.ai/https://wellfound.com/location/india"
+      "https://r.jina.ai/https://wellfound.com/location/india",
+      "https://r.jina.ai/https://wellfound.com/location/delhi-ncr",
+      "https://r.jina.ai/https://wellfound.com/location/gurgaon",
+      "https://r.jina.ai/https://wellfound.com/location/noida"
     ];
 
     const jobs = [];

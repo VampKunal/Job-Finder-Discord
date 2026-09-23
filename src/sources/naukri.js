@@ -21,7 +21,15 @@ const NAUKRI_FEEDS = [
   { url: "https://www.naukri.com/rss?ql=software+intern&l=india&experience=0&qf=", label: "SWE Intern" },
   { url: "https://www.naukri.com/rss?ql=data+science+fresher&l=india&experience=0&qf=", label: "Data Science Fresher" },
   { url: "https://www.naukri.com/rss?ql=node+developer+fresher&l=india&experience=0&qf=", label: "Node Fresher" },
-  { url: "https://www.naukri.com/rss?ql=java+developer+fresher&l=india&experience=0&qf=", label: "Java Fresher" }
+  { url: "https://www.naukri.com/rss?ql=java+developer+fresher&l=india&experience=0&qf=", label: "Java Fresher" },
+  { url: "https://www.naukri.com/rss?ql=software+engineer+fresher&l=noida&experience=0&qf=", label: "Noida SWE Fresher", location: "Noida, India" },
+  { url: "https://www.naukri.com/rss?ql=software+engineer+fresher&l=gurgaon&experience=0&qf=", label: "Gurgaon SWE Fresher", location: "Gurgaon, India" },
+  { url: "https://www.naukri.com/rss?ql=software+engineer+fresher&l=delhi+ncr&experience=0&qf=", label: "Delhi NCR SWE Fresher", location: "Delhi NCR, India" },
+  { url: "https://www.naukri.com/rss?ql=web+developer+fresher&l=noida&experience=0&qf=", label: "Noida Web Dev", location: "Noida, India" },
+  { url: "https://www.naukri.com/rss?ql=react+developer+fresher&l=gurgaon&experience=0&qf=", label: "Gurgaon React Fresher", location: "Gurgaon, India" },
+  { url: "https://www.naukri.com/rss?ql=full+stack+developer+fresher&l=delhi&experience=0&qf=", label: "Delhi Full Stack", location: "Delhi, India" },
+  { url: "https://www.naukri.com/rss?ql=software+intern&l=noida&experience=0&qf=", label: "Noida SWE Intern", location: "Noida, India" },
+  { url: "https://www.naukri.com/rss?ql=software+intern&l=gurgaon&experience=0&qf=", label: "Gurgaon SWE Intern", location: "Gurgaon, India" }
 ];
 
 async function fetchFeed(feed, seen) {
@@ -47,7 +55,7 @@ async function fetchFeed(feed, seen) {
         title,
         company: item.company || item.creator || "Naukri Employer",
         link,
-        location: "India",
+        location: feed.location || "India",
         description: description.length > 50 ? description : `${title}. Found via Naukri RSS (${feed.label}).`,
         date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
         source: `Naukri (${feed.label})`
