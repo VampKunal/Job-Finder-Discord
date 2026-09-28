@@ -37,10 +37,10 @@ Provide output in 2 formats:
 `;
 
   const models = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "mixtral-8x7b-32768",
-    "deepseek-r1-distill-llama-70b"
+    "openai/gpt-oss-120b",
+    "qwen/qwen3.8-27b",
+    "openai/gpt-oss-20b",
+    "allam-2-7b"
   ];
 
   for (const modelId of models) {
