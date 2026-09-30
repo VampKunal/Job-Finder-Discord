@@ -27,7 +27,7 @@ jobs:
 
       - name: Install Python Dependencies
         run: |
-          pip install "scrapling[fetchers,rag]"
+          pip install -r requirements.txt
           python -c "from scrapling.cli import install; install([], standalone_mode=False)"
 
       - name: Install Node Dependencies
